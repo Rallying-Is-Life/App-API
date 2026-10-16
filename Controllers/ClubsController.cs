@@ -1,3 +1,5 @@
+using App_API.Models;
+using Microsoft.AspNetCore.Mvc;
 using Azure.Data.Tables;
 
 namespace App_API.Controllers

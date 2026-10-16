@@ -9,8 +9,11 @@ namespace App_API.Controllers
         [HttpGet("/clubs")]
         public async Task<ActionResult<List<ClubTableEntity>>> Get()
         {
-            // TODO: inject TableClient; query Table Storage
-            return new List<ClubTableEntity>();
+            var endpoint = Environment.GetEnvironmentVariable("TableStorageUri");
+            var client = new TableClient(endpoint, TableNames.tblClubDetails);
+            var list = new List<ClubTableEntity>();
+            await foreach (ClubTableEntity c in client.QueryAsync<ClubTableEntity>()) { list.Add(c); }
+            return list;
         }
     }
 }

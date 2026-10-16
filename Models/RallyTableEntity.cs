@@ -5,6 +5,6 @@ namespace App_API.Models
         public int Year { get; set; }
         public string EventName { get; set; }
         public DateTime EventDate { get; set; }
-        public string OrganisingClub { get; set; }
+        public string OrganisingClubs { get; set; }
     }
 }

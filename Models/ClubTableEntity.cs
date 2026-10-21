@@ -4,5 +4,6 @@ namespace App_API.Models
     {
         public string ClubName { get; set; }
         public string Website { get; set; }
+        public string? LogoUrl { get; set; }
     }
 }

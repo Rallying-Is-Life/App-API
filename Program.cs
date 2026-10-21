@@ -1,15 +1,41 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.UI;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Map existing env vars (Auth__*) into AzureAd config section expected by Identity.Web
+builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+{
+    ["AzureAd:Instance"] = "https://login.microsoftonline.com",
+    // Read from deployed setting names (ClientID / ClientSecret) with Auth__* fallback
+    ["AzureAd:TenantId"] = (Environment.GetEnvironmentVariable("TenantID") ?? Environment.GetEnvironmentVariable("Auth__TenantId") ?? ""),
+    ["AzureAd:ClientId"] = (Environment.GetEnvironmentVariable("ClientID") ?? Environment.GetEnvironmentVariable("Auth__ClientId") ?? Environment.GetEnvironmentVariable("Auth__Audience") ?? ""),
+    ["AzureAd:ClientSecret"] = (Environment.GetEnvironmentVariable("ClientSecret") ?? Environment.GetEnvironmentVariable("Auth__ClientSecret") ?? "")
+});
 
 builder.Services.AddControllers();
+
+builder.Services.AddAuthentication("AzureAd")
+    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"), "AzureAd");
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Read", policy => policy.AddRequirements(new App_API.Authorization.ScopePolicy("Api.Read")));
+    options.AddPolicy("Write", policy => policy.AddRequirements(new App_API.Authorization.ScopePolicy("Api.Write")));
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .AddRequirements(new App_API.Authorization.ScopePolicy("Api.Read"))
+        .Build();
+});
+builder.Services.AddSingleton<IAuthorizationHandler, App_API.Authorization.ScopeHandler>();
+
 builder.Services.AddCors(options => options.AddPolicy("AllowFE", p => p.WithOrigins(Environment.GetEnvironmentVariable("feRallyingIsLifeBaseURL") ?? "https://localhost:3000").AllowAnyHeader().AllowAnyMethod()));
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -17,7 +43,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowFE");
 app.UseHttpsRedirection();
-
+app.UseCookiePolicy();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

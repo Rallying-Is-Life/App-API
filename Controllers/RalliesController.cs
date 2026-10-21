@@ -1,4 +1,5 @@
 using App_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Azure.Data.Tables;
 using Azure.Identity;
@@ -8,6 +9,7 @@ namespace App_API.Controllers
     public class RalliesController : ControllerBase
     {
         [HttpGet("/rallies")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<RallyTableEntity>>> Get()
         {
             var client = new TableClient(

@@ -8,11 +8,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
     ["AzureAd:Instance"] = "https://login.microsoftonline.com",
-    ["AzureAd:TenantId"] = Environment.GetEnvironmentVariable("Auth__TenantId") ?? "",
-    ["AzureAd:ClientId"] = (Environment.GetEnvironmentVariable("Auth__Audience")
-                            ?? Environment.GetEnvironmentVariable("Auth__ClientId") ?? ""),
-    ["AzureAd:ClientSecret"] = Environment.GetEnvironmentVariable("Auth__ClientSecret") ?? "",
-    ["AzureAd:CallbackPath"] = "/signin-oidc"
+    // Read from deployed setting names (ClientID / ClientSecret) with Auth__* fallback
+    ["AzureAd:TenantId"] = (Environment.GetEnvironmentVariable("TenantID") ?? Environment.GetEnvironmentVariable("Auth__TenantId") ?? ""),
+    ["AzureAd:ClientId"] = (Environment.GetEnvironmentVariable("ClientID") ?? Environment.GetEnvironmentVariable("Auth__ClientId") ?? Environment.GetEnvironmentVariable("Auth__Audience") ?? ""),
+    ["AzureAd:ClientSecret"] = (Environment.GetEnvironmentVariable("ClientSecret") ?? Environment.GetEnvironmentVariable("Auth__ClientSecret") ?? "")
 });
 
 builder.Services.AddControllers();

@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Identity.Web;
-using Microsoft.Identity.Web.UI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,12 +13,22 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 });
 
 builder.Services.AddControllers();
-
-builder.Services.AddAuthentication("AzureAd")
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"), "AzureAd");
-
-builder.Services.AddAuthorization(options =>
-{
+// Auth middleware (selective — controllers use [Authorize] / [AllowAnonymous])
+var tenantId = Environment.GetEnvironmentVariable("Auth__TenantId") ?? "";
+var apiAudience = Environment.GetEnvironmentVariable("Auth__Audience") ?? Environment.GetEnvironmentVariable("Auth__ClientId") ?? "";
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", o => {
+        o.Authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+        o.Audience = apiAudience;
+        o.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters {
+            ValidateAudience = true,
+            ValidAudience = apiAudience,
+            ValidateIssuer = true,
+            ValidIssuer = $"https://login.microsoftonline.com/{tenantId}/v2.0",
+            NameClaimType = "name",
+        };
+    });
+builder.Services.AddAuthorization(options => {
     options.AddPolicy("Read", policy => policy.AddRequirements(new App_API.Authorization.ScopePolicy("Api.Read")));
     options.AddPolicy("Write", policy => policy.AddRequirements(new App_API.Authorization.ScopePolicy("Api.Write")));
     options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
@@ -29,7 +37,6 @@ builder.Services.AddAuthorization(options =>
         .Build();
 });
 builder.Services.AddSingleton<IAuthorizationHandler, App_API.Authorization.ScopeHandler>();
-
 builder.Services.AddCors(options => options.AddPolicy("AllowFE", p => p.WithOrigins(Environment.GetEnvironmentVariable("feRallyingIsLifeBaseURL") ?? "https://localhost:3000").AllowAnyHeader().AllowAnyMethod()));
 
 builder.Services.AddOpenApi();
@@ -43,7 +50,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowFE");
 app.UseHttpsRedirection();
-app.UseCookiePolicy();
 app.UseAuthentication();
 app.UseAuthorization();
 

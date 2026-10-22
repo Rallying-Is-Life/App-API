@@ -10,7 +10,7 @@ namespace App_API.Controllers
     {
         [HttpGet("/clubs")]
         [AllowAnonymous]
-        public async Task<ActionResult<List<ClubTableEntity>>> Get()
+        public async Task<ActionResult<List<ClubTableEntity>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             var client = new TableClient(
                 new Uri(Environment.GetEnvironmentVariable("azureStorageUri")),
@@ -18,7 +18,8 @@ namespace App_API.Controllers
                 new DefaultAzureCredential());
             var list = new List<ClubTableEntity>();
             await foreach (ClubTableEntity c in client.QueryAsync<ClubTableEntity>()) { list.Add(c); }
-            return list;
+            list = list.OrderBy(c => c.ClubName).ToList();
+            return list.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         }
     }
 }

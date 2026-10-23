@@ -6,5 +6,7 @@ namespace App_API.Models
         public string EventName { get; set; }
         public DateTime EventDate { get; set; }
         public string OrganisingClubs { get; set; }
+        public double CompetitiveDistanceKm { get; set; }
+        public string DistanceUnit { get; set; }
     }
 }

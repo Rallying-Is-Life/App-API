@@ -3,7 +3,8 @@ namespace App_API.Controllers {
 public class StatsController : ControllerBase {
 [HttpGet("/stats")]
     [AllowAnonymous] public async Task<IActionResult> Get() {
-int C = 0, R = 0; var u = Environment.GetEnvironmentVariable("azureStorageUri"); var cred = new DefaultAzureCredential();
+int C = 0, R = 0, S = 0; var u = Environment.GetEnvironmentVariable("azureStorageUri"); var cred = new DefaultAzureCredential();
 await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblClubDetails).QueryAsync<Azure.Data.Tables.TableEntity>()) C++;
 await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblRallyDetails).QueryAsync<Azure.Data.Tables.TableEntity>()) R++;
-return Ok(new { clubs = C, rallies = R }); } } }
+await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblRallyStages).QueryAsync<Azure.Data.Tables.TableEntity>()) S++;
+return Ok(new { clubs = C, rallies = R, stages = S }); } } }

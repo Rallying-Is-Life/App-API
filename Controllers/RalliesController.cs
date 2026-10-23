@@ -17,7 +17,7 @@ namespace App_API.Controllers
                 TableNames.tblRallyDetails,
                 new DefaultAzureCredential());
             var list = new List<RallyTableEntity>();
-            await foreach (var r in client.QueryAsync<RallyTableEntity>()) { list.Add(r); }
+            await foreach (var r in client.QueryAsync<RallyTableEntity>(maxPerPage: 100)) { list.Add(r); }
             return list.OrderByDescending(r => r.EventDate)
                        .Skip((page - 1) * size).Take(size).ToList();
         }

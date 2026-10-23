@@ -9,6 +9,6 @@ public class RecoveryController : ControllerBase
         var client = new TableClient(new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!), "tblRescueRecoveryUnits", new DefaultAzureCredential());
         var list = new List<TableEntity>();
         await foreach (TableEntity r in client.QueryAsync<TableEntity>(filter: "PartitionKey eq 'recoveryUnit'")) { list.Add(r); }
-        return list.OrderBy(x => x.RowKey ?? x.PartitionKey).Skip((page - 1) * 20).Take(20).ToList();
+        return list.OrderBy(x => x["Name"]?.ToString() ?? x.RowKey ?? x.PartitionKey).Skip((page - 1) * 20).Take(20).ToList();
     }
 }

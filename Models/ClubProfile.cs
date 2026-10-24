@@ -10,6 +10,7 @@ public class RallyLink
 {
     public string RallyName { get; set; } = string.Empty;
     public string RallyRowKey { get; set; } = string.Empty;
+    public int Year { get; set; }
     public DateTime EventDate { get; set; }
 }
 public class ClubRallyIndexEntity : TableEntityBase

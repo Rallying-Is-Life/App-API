@@ -11,7 +11,7 @@ public class RecoveryProfilesController : ControllerBase
     public async Task<ActionResult<RescueRecoveryProfile>> GetRecoveryProfile([FromQuery] string id)
     {
         if (string.IsNullOrEmpty(id)) return BadRequest("id required");
-        var profile = new RescueRecoveryProfile { Name = id, Points = new List<StagePointLink>() };
+        var profile = new RescueRecoveryProfile { Name = id, Events = new List<StagePointLink>() };
         var unitClient = new TableClient(
             new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
             "tblRescueRecoveryUnits", new DefaultAzureCredential());
@@ -32,7 +32,7 @@ public class RecoveryProfilesController : ControllerBase
             {
                 stageName = s.GetString("StageName") ?? s.RowKey ?? stageName;
             }
-            profile.Points.Add(new StagePointLink
+            profile.Events.Add(new StagePointLink
             {
                 PointType = entity.GetString("PointType") ?? "",
                 StageRowKey = entity.RowKey ?? "",

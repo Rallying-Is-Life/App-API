@@ -16,7 +16,7 @@ public class StagePointLink
     public string PointType { get; set; } = string.Empty;
     public string StageRowKey { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public string Name => PointType ?? StageRowKey ?? Description;
+    public string Name { get; set; } = string.Empty;
 }
 public class RescueRecoveryProfile
 {

@@ -22,13 +22,21 @@ public class RecoveryProfilesController : ControllerBase
         var indexClient = new TableClient(
             new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
             "tblStageRescueRecoveryIndex", new DefaultAzureCredential());
+        var stageClient = new TableClient(
+            new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+            TableNames.tblRallyStages, new DefaultAzureCredential());
         await foreach (var entity in indexClient.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}'"))
         {
+            string stageName = entity.RowKey ?? "";
+            await foreach (var s in stageClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{entity.RowKey ?? id}'", maxPerPage: 10))
+            {
+                stageName = s.GetString("StageName") ?? s.RowKey ?? "";
+            }
             profile.Points.Add(new StagePointLink
             {
                 PointType = entity.GetString("PointType") ?? "",
                 StageRowKey = entity.RowKey ?? "",
-                Description = $"Point: {entity.GetString("PointType") ?? entity.RowKey ?? "unknown"}"
+                Name = stageName
             });
         }
         return Ok(profile);

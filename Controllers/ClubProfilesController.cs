@@ -33,6 +33,7 @@ public class ClubProfilesController : ControllerBase
             TableNames.tblClubRallyIndex, new DefaultAzureCredential());
 
         var rallies = new List<RallyLink>();
+<<<<<<< HEAD
         await foreach (var entry in indexClient.QueryAsync<TableEntity>(maxPerPage: 100))
         {
             if (entry.PartitionKey == id)
@@ -42,6 +43,17 @@ public class ClubProfilesController : ControllerBase
                     RallyRowKey = entry.RowKey ?? id,
                     RallyName = "Rally: " + (entry.RowKey ?? id),
                     EventDate = DateTime.Now
+=======
+        await foreach (var entry in indexClient.QueryAsync<ClubRallyIndexEntity>(maxPerPage: 100))
+        {
+            if (entry.PartitionKey == id || entry.RowKey?.Contains(id) == true)
+            {
+                rallies.Add(new RallyLink
+                {
+                    RallyName = entry.RallyName ?? entry.RowKey,
+                    RallyRowKey = entry.RallyRowKey ?? entry.RowKey,
+                    EventDate = entry.EventDate
+>>>>>>> origin/Development
                 });
             }
         }

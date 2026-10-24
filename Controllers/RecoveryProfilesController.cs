@@ -1,3 +1,4 @@
+using System.Linq;
 using App_API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -50,13 +51,13 @@ public class RecoveryProfilesController : ControllerBase
             profile.Events.Add(new StagePointLink
             {
                 PointType = entity.GetString("PointType") ?? "",
-                StageRowKey = entity.RowKey ?? "",
-                Name = stageName,
+                StageName = stageName,
                 StageNumber = stageNum,
                 Year = year,
                 EventName = eventName
             });
         }
+        profile.Events = profile.Events.OrderByDescending(e => e.Year).ToList();
         return Ok(profile);
     }
 }

@@ -12,11 +12,10 @@ public class RescueRecoveryProfile
 public class StagePointLink
 {
     public string PointType { get; set; } = string.Empty;
-    public string StageRowKey { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
     public int StageNumber { get; set; }
     public int Year { get; set; }
     public string EventName { get; set; } = string.Empty;
+    public string StageName { get; set; } = string.Empty;
 }
 public class RescueUnitEntity : TableEntityBase
 {

@@ -6,7 +6,7 @@ using Azure.Identity;
 namespace App_API.Controllers;
 public class RecoveryProfilesController : ControllerBase
 {
-    [HttpGet("profiles/rescue")]
+    [HttpGet("profiles/recovery")]
     [AllowAnonymous]
     public async Task<ActionResult<RescueRecoveryProfile>> GetRecoveryProfile([FromQuery] string id)
     {

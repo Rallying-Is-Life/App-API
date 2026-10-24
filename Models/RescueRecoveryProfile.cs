@@ -17,3 +17,9 @@ public class StagePointLink
     public string StageRowKey { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
 }
+public class RescueRecoveryProfile
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Website { get; set; }
+    public List<StagePointLink> Points { get; set; } = new();
+}

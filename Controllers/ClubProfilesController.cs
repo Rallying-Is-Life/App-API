@@ -29,10 +29,19 @@ public class ClubProfilesController : ControllerBase
         {
             if (entry.PartitionKey == id)
             {
+                string rallyRowKey = entry.RowKey ?? id;
+                string rallyName = rallyRowKey;
+                var rallyClient = new TableClient(
+                    new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+                    TableNames.tblRallyDetails, new DefaultAzureCredential());
+                await foreach (var r in rallyClient.QueryAsync<RallyTableEntity>(maxPerPage: 100))
+                {
+                    if (r.RowKey == rallyRowKey) { rallyName = r.EventName; break; }
+                }
                 rallies.Add(new RallyLink
                 {
-                    RallyRowKey = entry.RowKey ?? id,
-                    RallyName = "Rally: " + (entry.RowKey ?? id),
+                    RallyRowKey = rallyRowKey,
+                    RallyName = rallyName,
                     EventDate = DateTime.Now
                 });
             }

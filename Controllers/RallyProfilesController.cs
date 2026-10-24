@@ -55,13 +55,16 @@ public class RallyProfilesController : ControllerBase
             new DefaultAzureCredential());
 
         var stages = new List<StageInfo>();
-        await foreach (var entity in client.QueryAsync<StageEntity>(maxPerPage: 100))
+        await foreach (var entity in client.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}'", maxPerPage: 100))
         {
+            // RowKey = rallyid-stagenumber; extract stage number
+            var parts = (entity.RowKey ?? "").Split('-');
+            var stageNum = int.TryParse(parts.Length > 1 ? parts.Last() : parts.FirstOrDefault(), out var n) ? n : 0;
             stages.Add(new StageInfo
             {
-                StageNumber = entity.StageNumber,
-                StageName = entity.StageName,
-                StageLength = entity.StageLengthKm
+                StageNumber = stageNum,
+                StageName = entity.GetString("StageName") ?? entity.RowKey ?? "",
+                StageLength = entity.GetDouble("StageLengthKm") ?? 0
             });
         }
 
@@ -84,25 +87,4 @@ public class RallyProfilesController : ControllerBase
     }
 }
 
-public class RallyProfileSummary
-{
-    public string RallyName { get; set; } = string.Empty;
-    public DateTime EventDate { get; set; }
-    public double LengthKm { get; set; }
-    public int StageCount { get; set; }
-    public string RallyRowKey { get; set; } = string.Empty;
-}
 
-public class StageInfo
-{
-    public int StageNumber { get; set; }
-    public string StageName { get; set; } = string.Empty;
-    public double StageLength { get; set; }
-}
-
-public class StageEntity : TableEntityBase
-{
-    public string StageName { get; set; } = string.Empty;
-    public double StageLengthKm { get; set; }
-    public int StageNumber { get; set; }
-}

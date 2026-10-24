@@ -3,9 +3,6 @@ using Azure.Data.Tables;
 public class RescueRecoveryProfile
 {
     public string Name { get; set; } = string.Empty;
-    public int StageNumber { get; set; }
-    public int Year { get; set; }
-    public string EventName { get; set; } = string.Empty;
     public string? Website { get; set; }
     public List<StagePointLink> Events { get; set; } = new();
 }

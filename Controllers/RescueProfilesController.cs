@@ -8,16 +8,22 @@ public class RescueProfilesController : ControllerBase
 {
     [HttpGet("profiles/rescue")]
     [AllowAnonymous]
-    public async Task<ActionResult<RescueUnitEntity>> GetRescueProfile([FromQuery] string id)
+    public async Task<ActionResult<List<StagePointLink>>> GetRescueProfile([FromQuery] string id)
     {
         if (string.IsNullOrEmpty(id)) return BadRequest("id required");
         var client = new TableClient(
             new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
-            "tblRescueRecoveryUnits", new DefaultAzureCredential());
-        await foreach (var r in client.QueryAsync<RescueUnitEntity>(filter: "PartitionKey eq 'rescueUnit'"))
+            "tblStageRescueRecoveryIndex", new DefaultAzureCredential());
+        var points = new List<StagePointLink>();
+        await foreach (var entity in client.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}'"))
         {
-            if (r.RowKey == id) return Ok(r);
+            points.Add(new StagePointLink
+            {
+                PointType = entity.GetString("PointType") ?? "",
+                StageRowKey = entity.RowKey ?? "",
+                Description = $"Point: {entity.GetString("PointType") ?? entity.RowKey ?? "unknown"}"
+            });
         }
-        return NotFound();
+        return Ok(points);
     }
 }

@@ -4,7 +4,7 @@ public class RescueRecoveryProfile
 {
     public string Name { get; set; } = string.Empty;
     public string? Website { get; set; }
-    public List<StagePointLink> Points { get; set; } = new();
+    public List<StagePointLink> Events { get; set; } = new();
 }
 public class StagePointLink
 {

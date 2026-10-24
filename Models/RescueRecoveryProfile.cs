@@ -10,4 +10,13 @@ public class RecoveryUnitEntity : TableEntityBase
 {
     public string? Name { get; set; }
     public string? Website { get; set; }
+<<<<<<< HEAD
+}
+public class StagePointLink
+{
+    public string PointType { get; set; } = string.Empty; // start / midpoint
+    public string StageRowKey { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+=======
+>>>>>>> origin/Development
 }

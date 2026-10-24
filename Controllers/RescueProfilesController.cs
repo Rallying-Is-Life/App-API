@@ -32,11 +32,30 @@ public class RescueProfilesController : ControllerBase
             {
                 stageName = s.GetString("StageName") ?? s.RowKey ?? stageName;
             }
+            // Extract rally id from stage RowKey (format: rallyid-stagenumber) to look up EventName/Year
+            string stageRowKey = entity.RowKey ?? id;
+            string rallyId = stageRowKey;
+            int stageNum = 0;
+            var parts = (entity.RowKey ?? "").Split('-');
+            if (parts.Length > 1) { rallyId = string.Join("-", parts.Take(parts.Length - 1)); int.TryParse(parts.Last(), out stageNum); }
+            else { int.TryParse(entity.RowKey ?? "", out stageNum); rallyId = entity.RowKey ?? ""; }
+            string eventName = "";
+            int year = 0;
+            var rallyClient = new TableClient(
+                new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+                TableNames.tblRallyDetails, new DefaultAzureCredential());
+            await foreach (var r in rallyClient.QueryAsync<RallyTableEntity>(maxPerPage: 100))
+            {
+                if (r.RowKey == rallyId) { eventName = r.EventName; year = r.Year; break; }
+            }
             profile.Events.Add(new StagePointLink
             {
                 PointType = entity.GetString("PointType") ?? "",
                 StageRowKey = entity.RowKey ?? "",
-                Name = stageName
+                Name = stageName,
+                StageNumber = stageNum,
+                Year = year,
+                EventName = eventName
             });
         }
         return Ok(profile);

@@ -5,6 +5,7 @@ using Azure.Data.Tables;
 using Azure.Identity;
 using System.Linq;
 namespace App_API.Controllers;
+[AllowAnonymous]
 public class ClubProfilesController : ControllerBase
 {
     [HttpGet("profiles/club")]

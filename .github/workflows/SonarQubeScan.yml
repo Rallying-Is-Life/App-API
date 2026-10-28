@@ -1,8 +1,11 @@
 name: SonarQube Scan
 
 on:
-  workflow_dispatch
-
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  
 jobs:
   build:
     name: Build and analyze

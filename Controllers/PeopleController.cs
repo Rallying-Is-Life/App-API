@@ -8,7 +8,7 @@ namespace App_API.Controllers
     [AllowAnonymous][Route("people")]
     public class PeopleController : ControllerBase
     {
-        [HttpGet] public async Task<IActionResult> Get([FromQuery] string type = null, [FromQuery] string role = null)
+        [HttpGet] public async Task<IActionResult> Get([FromQuery] string type = null, [FromQuery] string role = null, [FromQuery] string q = null)
         {
             var q = (type ?? role ?? "").ToLower();
             var filterRole = q.Contains("co") || q.Contains("codriver") ? "CoDriver" : "Driver";

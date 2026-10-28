@@ -7,7 +7,10 @@ int C = 0, R = 0, S = 0; var u = Environment.GetEnvironmentVariable("azureStorag
 await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblClubDetails).QueryAsync<Azure.Data.Tables.TableEntity>()) C++;
 await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblRallyDetails).QueryAsync<Azure.Data.Tables.TableEntity>()) R++;
 await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblRallyStages).QueryAsync<Azure.Data.Tables.TableEntity>()) S++;
+int cars = 0; await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblCars).QueryAsync<Azure.Data.Tables.TableEntity>()) cars++;
 int rescue = 0, recovery = 0;
 await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient("tblRescueRecoveryUnits").QueryAsync<Azure.Data.Tables.TableEntity>(filter: "PartitionKey eq 'rescueUnit'")) rescue++;
 await foreach(var _ in new TableServiceClient(new Uri(u), cred).GetTableClient("tblRescueRecoveryUnits").QueryAsync<Azure.Data.Tables.TableEntity>(filter: "PartitionKey eq 'recoveryUnit'")) recovery++;
-return Ok(new { clubs = C, rallies = R, stages = S, rescueUnits = rescue, recoveryUnits = recovery }); } } }
+int drivers = 0; await foreach(var e in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblPersonEventIndex).QueryAsync<Azure.Data.Tables.TableEntity>(filter: "Role eq 'Driver'")) drivers++;
+int coDrivers = 0; await foreach(var e in new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblPersonEventIndex).QueryAsync<Azure.Data.Tables.TableEntity>(filter: "Role eq 'CoDriver'")) coDrivers++;
+return Ok(new { clubs = C, rallies = R, stages = S, cars = cars, rescueUnits = rescue, recoveryUnits = recovery, drivers = drivers, coDrivers = coDrivers }); } } }

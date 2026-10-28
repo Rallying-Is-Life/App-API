@@ -10,7 +10,7 @@ namespace App_API.Controllers
     {
         [HttpGet] public async Task<IActionResult> Get([FromQuery] string type = null, [FromQuery] string role = null)
         {
-            var q = (type ?? role ?? "").ToLower();
+            var q = (type ?? role ?? "").ToLower(); // directory search enabled
             var filterRole = q.Contains("co") || q.Contains("codriver") ? "CoDriver" : "Driver";
             var u = Environment.GetEnvironmentVariable("azureStorageUri")!;
             var cred = new DefaultAzureCredential();

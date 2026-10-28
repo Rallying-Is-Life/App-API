@@ -6,4 +6,6 @@ public string EventRowKey { get; set; } = "";
 public DateTimeOffset? EventDate { get; set; }
 public string? EntrantSponsor { get; set; }
 public int Class { get; set; }
+public int EventYear { get; set; }
+public string EventName { get; set; } = "";
 } }

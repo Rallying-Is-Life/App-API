@@ -26,8 +26,8 @@ rowKey = car.Value.RowKey,
 rallies = idxList
 .OrderBy(e => e.EventDate)
 .Select(e => new {
-year = e.EventDate?.Year ?? 0,
-rallyName = (e.EventRowKey?.Length > 0 ? "Event " + e.EventRowKey[..8] : "—"),
+year = e.EventYear > 0 ? e.EventYear : (e.EventDate?.Year ?? 0),
+rallyName = (!string.IsNullOrEmpty(e.EventName) ? e.EventName : (e.RowKey ?? "—")),
 rallyRowKey = e.RowKey
 })
 });

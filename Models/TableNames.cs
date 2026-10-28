@@ -9,5 +9,6 @@ namespace App_API.Models
         public const string tblCarEventIndex = "tblCarEventIndex";
         public const string tblCars = "tblCars";
 public const string tblEventEntries = "tblEventEntries";
+        public const string tblPersonEventIndex = "tblPersonEventIndex";
     }
 }

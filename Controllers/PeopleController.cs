@@ -1,0 +1,1 @@
+using Microsoft.AspNetCore.Mvc; namespace App_API.Controllers { [AllowAnonymous][Route("people")][HttpGet] public class PeopleController:ControllerBase { [HttpGet] public async Task<IActionResult> Get([FromQuery] string type) { return Ok(new{type,type}); } } }

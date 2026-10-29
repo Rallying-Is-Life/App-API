@@ -24,7 +24,9 @@ namespace App_API.Controllers
                 await foreach(var p in peopleClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{personRowKey}'"))
                 { first = p["FirstName"]?.ToString() ?? ""; surname = p["Surname"]?.ToString() ?? ""; nat = p["Nationality"]?.ToString() ?? ""; reg = p["Region"]?.ToString() ?? ""; }
                 string displayNat = !string.IsNullOrEmpty(reg) ? reg : nat;
-                people.Add(new { personRowKey, firstName = first, surname, nationality = displayNat, region = reg, role = e["Role"]?.ToString(), eventYear = e["EventYear"]?.ToString(), eventName = e["EventName"]?.ToString() });
+                string flag = "";
+                try { var refClient = new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblReferenceValues); await foreach(var r in refClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{displayNat}'")) { flag = r["Flag"]?.ToString() ?? ""; } } catch { }
+                people.Add(new { personRowKey, firstName = first, surname, nationality = displayNat, region = reg, role = e["Role"]?.ToString(), eventYear = e["EventYear"]?.ToString(), eventName = e["EventName"]?.ToString(), flag = flag });
             }
             return Ok(new { query = type ?? role, filterRole, count = people.Count, items = people });
         }

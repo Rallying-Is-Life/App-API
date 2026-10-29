@@ -11,5 +11,6 @@ namespace App_API.Models
 public const string tblEventEntries = "tblEventEntries";
         public const string tblPeople = "tblPeople";
         public const string tblPersonEventIndex = "tblPersonEventIndex";
+            public const string tblReferenceValues = "tblReferenceValues";
     }
 }

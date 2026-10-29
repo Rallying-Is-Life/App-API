@@ -8,6 +8,7 @@ public class RallyProfileSummary
     public double LengthKm { get; set; }
     public int StageCount { get; set; }
     public string RallyRowKey { get; set; } = string.Empty;
+    public string Website { get; set; } = string.Empty;
 }
 public class StageInfo
 {

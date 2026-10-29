@@ -33,7 +33,8 @@ public class RallyProfilesController : ControllerBase
                     EventDate = r.EventDate,
                     LengthKm = r.CompetitiveDistanceKm,
                     StageCount = stageCount,
-                    RallyRowKey = r.RowKey
+                    RallyRowKey = r.RowKey,
+                    Website = r.Website ?? string.Empty
                 });
             }
         }

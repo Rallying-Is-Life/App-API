@@ -26,6 +26,7 @@ public class RallyProfilesController : ControllerBase
         {
             if (r.RowKey == id)
             {
+                var entryCount = await GetEntryCount(id);
                 var stageCount = await GetStageCount();
                 return Ok(new RallyProfileSummary
                 {
@@ -33,6 +34,7 @@ public class RallyProfilesController : ControllerBase
                     EventDate = r.EventDate,
                     LengthKm = r.CompetitiveDistanceKm,
                     StageCount = stageCount,
+                    EntryCount = entryCount,
                     RallyRowKey = r.RowKey,
                     Website = r.Website ?? string.Empty
                 });
@@ -70,6 +72,20 @@ public class RallyProfilesController : ControllerBase
         }
 
         return Ok(stages.OrderBy(s => s.StageNumber).ToList());
+    }
+
+    private static async Task<int> GetEntryCount(string rallyRowKey)
+    {
+        var client = new TableClient(
+            new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+            TableNames.tblEventEntries,
+            new DefaultAzureCredential());
+        var count = 0;
+        await foreach (var entity in client.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{rallyRowKey}'", maxPerPage: 100))
+        {
+            count++;
+        }
+        return count;
     }
 
     private static async Task<int> GetStageCount()

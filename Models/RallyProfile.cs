@@ -7,6 +7,7 @@ public class RallyProfileSummary
     public DateTime EventDate { get; set; }
     public double LengthKm { get; set; }
     public int StageCount { get; set; }
+    public int EntryCount { get; set; }
     public string RallyRowKey { get; set; } = string.Empty;
     public string Website { get; set; } = string.Empty;
 }

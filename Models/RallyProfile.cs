@@ -14,11 +14,12 @@ public class StageInfo
 {
     public int StageNumber { get; set; }
     public string StageName { get; set; } = string.Empty;
-    public double StageLength { get; set; }
+    public string StageLength { get; set; } = string.Empty;
 }
 public class StageEntity : TableEntityBase
 {
     public string StageName { get; set; } = string.Empty;
     public double StageLengthKm { get; set; }
+    public string LengthUnit { get; set; } = string.Empty;
     public int StageNumber { get; set; }
 }

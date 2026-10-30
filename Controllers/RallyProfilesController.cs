@@ -65,7 +65,7 @@ public class RallyProfilesController : ControllerBase
             {
                 StageNumber = stageNum,
                 StageName = entity.GetString("StageName") ?? entity.RowKey ?? "",
-                StageLength = entity.GetDouble("StageLengthKm") ?? 0
+                StageLength = (entity.GetDouble("StageLength") ?? 0).ToString() + (entity.GetString("LengthUnit") ?? "")
             });
         }
 

@@ -8,5 +8,6 @@ namespace App_API.Models
         public string OrganisingClubs { get; set; }
         public double CompetitiveDistanceKm { get; set; }
         public string DistanceUnit { get; set; }
+        public string Website { get; set; }
     }
 }

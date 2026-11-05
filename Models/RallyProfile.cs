@@ -16,6 +16,7 @@ public class StageInfo
     public int StageNumber { get; set; }
     public string StageName { get; set; } = string.Empty;
     public string StageLength { get; set; } = string.Empty;
+    public string FlagUrl { get; set; } = string.Empty;
 }
 public class StageEntity : TableEntityBase
 {
@@ -23,4 +24,7 @@ public class StageEntity : TableEntityBase
     public double StageLengthKm { get; set; }
     public string LengthUnit { get; set; } = string.Empty;
     public int StageNumber { get; set; }
+    public string? Country { get; set; } = string.Empty;
+    public string? Region { get; set; } = string.Empty;
+    public string? FlagCode { get; set; } = string.Empty;
 }

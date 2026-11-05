@@ -9,6 +9,24 @@ namespace App_API.Controllers;
 
 public class RallyProfilesController : ControllerBase
 {
+    private static string ParseFlagCode(string country, string region)
+    {
+        if (string.IsNullOrEmpty(country) || string.IsNullOrEmpty(region))
+            return string.Empty;
+        if (country.Equals("GB", StringComparison.OrdinalIgnoreCase))
+        {
+            switch (region.ToLower())
+            {
+                case "wales": return "gb-wls";
+                case "scotland": return "gb-sct";
+                case "england": return "gb-eng";
+                case "northern ireland": case "ni": return "gb-nir";
+                default: return "gb";
+            }
+        }
+        return country.ToLower();
+    }
+
     // Single rally profile based on rowkey (?id=) — returns one rally only
     [HttpGet("profiles/rally")]
     [AllowAnonymous]
@@ -63,11 +81,19 @@ public class RallyProfilesController : ControllerBase
             // RowKey = rallyid-stagenumber; extract stage number
             var parts = (entity.RowKey ?? "").Split('-');
             var stageNum = int.TryParse(parts.Length > 1 ? parts.Last() : parts.FirstOrDefault(), out var n) ? n : 0;
+            var country = entity.GetString("Country") ?? "";
+            var region = entity.GetString("Region") ?? "";
+            var flagCode = ParseFlagCode(country, region);
+            var flagUrl = string.IsNullOrEmpty(flagCode) ? "" : $"/images/flags/4x3/{flagCode}.svg";
+            var stageLengthKm = entity.GetDouble("StageLengthKm") ?? 0;
+            var lengthUnit = entity.GetString("LengthUnit") ?? "km";
+            var stageLengthDisplay = $"{stageLengthKm} {lengthUnit}";
             stages.Add(new StageInfo
             {
                 StageNumber = stageNum,
                 StageName = entity.GetString("StageName") ?? entity.RowKey ?? "",
-                StageLength = (entity.GetDouble("StageLength") ?? 0).ToString() + (entity.GetString("LengthUnit") ?? "")
+                StageLength = stageLengthDisplay,
+                FlagUrl = flagUrl
             });
         }
 
@@ -103,5 +129,3 @@ public class RallyProfilesController : ControllerBase
         return count;
     }
 }
-
-

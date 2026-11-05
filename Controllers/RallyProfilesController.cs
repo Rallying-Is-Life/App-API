@@ -87,7 +87,7 @@ public class RallyProfilesController : ControllerBase
             var region = entity.GetString("Region") ?? "";
             var flagCode = ParseFlagCode(country, region);
             var flagUrl = string.IsNullOrEmpty(flagCode) ? "" : $"/images/flags/4x3/{flagCode}.svg";
-            var stageLengthKm = entity.GetDouble("StageLengthKm") ?? 0;
+            var stageLengthKm = entity.GetDouble("StageLength") ?? 0;
             var lengthUnit = entity.GetString("LengthUnit") ?? "km";
             var stageLengthDisplay = $"{stageLengthKm} {lengthUnit}";
             stages.Add(new StageInfo

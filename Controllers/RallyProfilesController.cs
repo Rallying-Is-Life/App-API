@@ -11,10 +11,12 @@ public class RallyProfilesController : ControllerBase
 {
     private static string ParseFlagCode(string country, string region)
     {
-        if (string.IsNullOrEmpty(country) || string.IsNullOrEmpty(region))
+        if (string.IsNullOrEmpty(country))
             return string.Empty;
         if (country.Equals("GB", StringComparison.OrdinalIgnoreCase))
         {
+            if (string.IsNullOrEmpty(region))
+                return string.Empty;
             switch (region.ToLower())
             {
                 case "wales": return "gb-wls";

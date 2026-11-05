@@ -15,7 +15,7 @@ namespace App_API.Controllers
             if (country.Equals("GB", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrEmpty(region))
-                    return string.Empty;
+                    return "gb";
                 switch (region.ToLower())
                 {
                     case "wales": return "gb-wls";

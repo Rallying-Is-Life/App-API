@@ -16,7 +16,7 @@ public class RallyProfilesController : ControllerBase
         if (country.Equals("GB", StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrEmpty(region))
-                return string.Empty;
+                return "gb";
             switch (region.ToLower())
             {
                 case "wales": return "gb-wls";

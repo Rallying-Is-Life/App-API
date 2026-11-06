@@ -12,5 +12,6 @@ namespace App_API.Models
         public string? Country { get; set; }
         public string? Region { get; set; }
         public string? FlagCode { get; set; }
+        public string? LogoUrl { get; set; }
     }
 }

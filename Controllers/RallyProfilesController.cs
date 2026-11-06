@@ -59,8 +59,9 @@ public class RallyProfilesController : ControllerBase
                     Website = r.Website ?? string.Empty,
                     Country = r.Country,
                     Region = r.Region,
-FlagUrl = string.IsNullOrEmpty(ParseFlagCode(r.Country, r.Region)) ? "" :
-                              $"/images/flags/4x3/{ParseFlagCode(r.Country, r.Region)}.svg"
+                    FlagUrl = string.IsNullOrEmpty(ParseFlagCode(r.Country, r.Region)) ? "" :
+                             $"/images/flags/4x3/{ParseFlagCode(r.Country, r.Region)}.svg",
+                    LogoUrl = r.LogoUrl
                 });
             }
         }

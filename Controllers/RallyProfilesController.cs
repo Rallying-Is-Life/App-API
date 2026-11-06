@@ -56,7 +56,10 @@ public class RallyProfilesController : ControllerBase
                     StageCount = stageCount,
                     EntryCount = entryCount,
                     RallyRowKey = r.RowKey,
-                    Website = r.Website ?? string.Empty
+                    Website = r.Website ?? string.Empty,
+                    Country = r.Country,
+                    Region = r.Region,
+                    FlagUrl = string.IsNullOrEmpty(ParseFlagCode(r.Country, r.Region)) ? "" : $"/images/flags/4x3/{ParseFlagCode(r.Country, r.Region)}.svg"
                 });
             }
         }

@@ -10,6 +10,9 @@ public class RallyProfileSummary
     public int EntryCount { get; set; }
     public string RallyRowKey { get; set; } = string.Empty;
     public string Website { get; set; } = string.Empty;
+    public string? Country { get; set; }
+    public string? Region { get; set; }
+    public string? FlagUrl { get; set; }
 }
 public class StageInfo
 {

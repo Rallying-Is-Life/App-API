@@ -31,8 +31,8 @@ public class RallyProfilesController : ControllerBase
 
     // Single rally profile based on rowkey (?id=) — returns one rally only
     [HttpGet("profiles/rally")]
-    [AllowAnonymous]
-    public async Task<ActionResult<RallyProfileSummary>> GetRallyProfile([FromQuery] string id)
+    [anon]
+    public async Task<IActionResult> GetRallyProfile([FromQuery] string id)
     {
         if (string.IsNullOrEmpty(id))
             return BadRequest("id parameter is required");
@@ -70,8 +70,8 @@ public class RallyProfilesController : ControllerBase
 
     // Stages for a specific rally (?id=) — returns stages table
     [HttpGet("profiles/rally/stages")]
-    [AllowAnonymous]
-    public async Task<ActionResult<List<StageInfo>>> GetStagesForRally([FromQuery] string id)
+    [anon]
+    public async Task<IActionResult> GetStagesForRally([FromQuery] string id)
     {
         if (string.IsNullOrEmpty(id))
             return BadRequest("id parameter is required");
@@ -90,7 +90,7 @@ public class RallyProfilesController : ControllerBase
             var region = entity.GetString("Region") ?? "";
             var flagCode = ParseFlagCode(country, region);
             var flagUrl = string.IsNullOrEmpty(flagCode) ? "" : $"/images/flags/4x3/{flagCode}.svg";
-            var stageLengthKm = entity.GetDouble("StageLengthKm") ?? 0;
+            var stageLengthKm = entity.GetDouble("StageLength") ?? 0;
             var lengthUnit = entity.GetString("LengthUnit") ?? "km";
             var stageLengthDisplay = $"{stageLengthKm} {lengthUnit}";
             stages.Add(new StageInfo

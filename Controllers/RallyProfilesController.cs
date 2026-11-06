@@ -13,10 +13,10 @@ public class RallyProfilesController : ControllerBase
     {
         if (string.IsNullOrEmpty(country))
             return string.Empty;
+        if (string.IsNullOrEmpty(region))
+            return country.ToLower();
         if (country.Equals("GB", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrEmpty(region))
-                return "gb";
             switch (region.ToLower())
             {
                 case "wales": return "gb-wls";
@@ -56,7 +56,11 @@ public class RallyProfilesController : ControllerBase
                     StageCount = stageCount,
                     EntryCount = entryCount,
                     RallyRowKey = r.RowKey,
-                    Website = r.Website ?? string.Empty
+                    Website = r.Website ?? string.Empty,
+                    Country = r.Country,
+                    Region = r.Region,
+FlagUrl = string.IsNullOrEmpty(ParseFlagCode(r.Country, r.Region)) ? "" :
+                              $"/images/flags/4x3/{ParseFlagCode(r.Country, r.Region)}.svg"
                 });
             }
         }
@@ -80,7 +84,6 @@ public class RallyProfilesController : ControllerBase
         var stages = new List<StageInfo>();
         await foreach (var entity in client.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}'", maxPerPage: 100))
         {
-            // RowKey = rallyid-stagenumber; extract stage number
             var parts = (entity.RowKey ?? "").Split('-');
             var stageNum = int.TryParse(parts.Length > 1 ? parts.Last() : parts.FirstOrDefault(), out var n) ? n : 0;
             var country = entity.GetString("Country") ?? "";
@@ -122,7 +125,6 @@ public class RallyProfilesController : ControllerBase
             new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
             TableNames.tblRallyStages,
             new DefaultAzureCredential());
-
         var count = 0;
         await foreach (var entity in client.QueryAsync<StageEntity>(maxPerPage: 100))
         {

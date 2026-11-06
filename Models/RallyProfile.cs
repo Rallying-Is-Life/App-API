@@ -13,6 +13,7 @@ public class RallyProfileSummary
     public string? Country { get; set; }
     public string? Region { get; set; }
     public string? FlagUrl { get; set; }
+    public string? LogoUrl { get; set; }
 }
 public class StageInfo
 {

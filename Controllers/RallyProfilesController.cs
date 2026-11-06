@@ -31,8 +31,8 @@ public class RallyProfilesController : ControllerBase
 
     // Single rally profile based on rowkey (?id=) — returns one rally only
     [HttpGet("profiles/rally")]
-    [anon]
-    public async Task<IActionResult> GetRallyProfile([FromQuery] string id)
+    [AllowAnonymous]
+    public async Task<ActionResult<RallyProfileSummary>> GetRallyProfile([FromQuery] string id)
     {
         if (string.IsNullOrEmpty(id))
             return BadRequest("id parameter is required");
@@ -59,7 +59,7 @@ public class RallyProfilesController : ControllerBase
                     Website = r.Website ?? string.Empty,
                     Country = r.Country,
                     Region = r.Region,
-                    FlagUrl = string.IsNullOrEmpty(ParseFlagCode(r.Country, r.Region)) ? "" :
+FlagUrl = string.IsNullOrEmpty(ParseFlagCode(r.Country, r.Region)) ? "" :
                               $"/images/flags/4x3/{ParseFlagCode(r.Country, r.Region)}.svg"
                 });
             }
@@ -70,8 +70,8 @@ public class RallyProfilesController : ControllerBase
 
     // Stages for a specific rally (?id=) — returns stages table
     [HttpGet("profiles/rally/stages")]
-    [anon]
-    public async Task<IActionResult> GetStagesForRally([FromQuery] string id)
+    [AllowAnonymous]
+    public async Task<ActionResult<List<StageInfo>>> GetStagesForRally([FromQuery] string id)
     {
         if (string.IsNullOrEmpty(id))
             return BadRequest("id parameter is required");

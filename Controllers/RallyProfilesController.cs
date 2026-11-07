@@ -102,8 +102,7 @@ public class RallyProfilesController : ControllerBase
                 StageName = entity.GetString("StageName") ?? entity.RowKey ?? "",
                 StageLength = stageLengthDisplay,
                 FlagUrl = flagUrl,
-                Scheduled = stageDate,
-                ScheduledEnd = stageDate
+                StageDate = stageDate
             });
         }
 

@@ -13,6 +13,7 @@ public class RallyProfileSummary
     public string? Country { get; set; }
     public string? Region { get; set; }
     public string? FlagUrl { get; set; }
+    public DateTime? EndDate { get; set; }
     public string? LogoUrl { get; set; }
 }
 public class StageInfo
@@ -21,6 +22,7 @@ public class StageInfo
     public string StageName { get; set; } = string.Empty;
     public string StageLength { get; set; } = string.Empty;
     public string FlagUrl { get; set; } = string.Empty;
+    public DateTimeOffset? StageDate { get; set; }
 }
 public class StageEntity : TableEntityBase
 {

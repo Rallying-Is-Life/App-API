@@ -52,6 +52,7 @@ public class RallyProfilesController : ControllerBase
                 {
                     RallyName = r.EventName,
                     EventDate = r.EventDate,
+                    EndDate = r.EndDate,
                     LengthKm = r.CompetitiveDistanceKm,
                     StageCount = stageCount,
                     EntryCount = entryCount,

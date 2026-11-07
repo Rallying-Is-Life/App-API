@@ -14,6 +14,7 @@ public class RallyProfileSummary
     public string? Region { get; set; }
     public string? FlagUrl { get; set; }
     public DateTime? EndDate { get; set; }
+    public string? LogoUrl { get; set; }
 }
 public class StageInfo
 {

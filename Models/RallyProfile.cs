@@ -22,8 +22,7 @@ public class StageInfo
     public string StageName { get; set; } = string.Empty;
     public string StageLength { get; set; } = string.Empty;
     public string FlagUrl { get; set; } = string.Empty;
-    public DateTimeOffset? Scheduled { get; set; }
-    public DateTimeOffset? ScheduledEnd { get; set; }
+    public DateTimeOffset? StageDate { get; set; }
 }
 public class StageEntity : TableEntityBase
 {

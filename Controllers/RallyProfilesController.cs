@@ -95,16 +95,15 @@ public class RallyProfilesController : ControllerBase
             var stageLengthKm = entity.GetDouble("StageLength") ?? 0;
             var lengthUnit = entity.GetString("LengthUnit") ?? "km";
             var stageLengthDisplay = $"{stageLengthKm} {lengthUnit}";
-            var scheduled = entity.GetDateTimeOffset("Scheduled");
-            var scheduledEnd = entity.GetDateTimeOffset("ScheduledEnd");
+            var stageDate = entity.GetDateTimeOffset("StageDate");
             stages.Add(new StageInfo
             {
                 StageNumber = stageNum,
                 StageName = entity.GetString("StageName") ?? entity.RowKey ?? "",
                 StageLength = stageLengthDisplay,
                 FlagUrl = flagUrl,
-                Scheduled = scheduled,
-                ScheduledEnd = scheduledEnd
+                Scheduled = stageDate,
+                ScheduledEnd = stageDate
             });
         }
 

@@ -23,6 +23,7 @@ public class StageInfo
     public string StageLength { get; set; } = string.Empty;
     public string FlagUrl { get; set; } = string.Empty;
     public DateTimeOffset? StageDate { get; set; }
+    public string? Leg { get; set; }
 }
 public class StageEntity : TableEntityBase
 {

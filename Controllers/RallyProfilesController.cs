@@ -95,7 +95,17 @@ public class RallyProfilesController : ControllerBase
             var stageLengthKm = entity.GetDouble("StageLength") ?? 0;
             var lengthUnit = entity.GetString("LengthUnit") ?? "km";
             var stageLengthDisplay = $"{stageLengthKm} {lengthUnit}";
-            var stageDate = entity.GetDateTimeOffset("StageDate");
+            // StageDate may be stored as DateTimeOffset (when set) or string (empty string when not set in Admin)
+            DateTimeOffset? stageDate = null;
+            if (entity.TryGetValue("StageDate", out var stageDateObj))
+            {
+                if (stageDateObj is DateTimeOffset dto)
+                    stageDate = dto;
+                else if (stageDateObj is DateTime dt)
+                    stageDate = new DateTimeOffset(dt, TimeSpan.Zero);
+                else if (stageDateObj is string s && DateTimeOffset.TryParse(s, out var parsed))
+                    stageDate = parsed;
+            }
             var leg = entity.GetString("Leg") ?? string.Empty;
             stages.Add(new StageInfo
             {

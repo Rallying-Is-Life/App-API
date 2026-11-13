@@ -107,11 +107,13 @@ public class RallyProfilesController : ControllerBase
                     stageDate = parsed;
             }
             var leg = entity.GetString("Leg") ?? string.Empty;
+            var stageType = entity.GetString("StageType") ?? string.Empty;
             stages.Add(new StageInfo
             {
                 StageNumber = stageNum,
                 StageName = entity.GetString("StageName") ?? entity.RowKey ?? "",
                 StageLength = stageLengthDisplay,
+                StageType = stageType,
                 FlagUrl = flagUrl,
                 StageDate = stageDate,
                 Leg = leg

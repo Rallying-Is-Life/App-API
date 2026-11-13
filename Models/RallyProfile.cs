@@ -21,6 +21,7 @@ public class StageInfo
     public int StageNumber { get; set; }
     public string StageName { get; set; } = string.Empty;
     public string StageLength { get; set; } = string.Empty;
+    public string StageType { get; set; } = string.Empty;
     public string FlagUrl { get; set; } = string.Empty;
     public DateTimeOffset? StageDate { get; set; }
     public string? Leg { get; set; }

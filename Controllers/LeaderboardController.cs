@@ -129,10 +129,8 @@ public class LeaderboardController : ControllerBase
             stageResults.Add(entity);
         }
 
-        // Sort by StageSequence (numeric, stored as zero-padded string)
-        stageResults = stageResults
-            .OrderBy(s => int.TryParse(s.StageSequence, out var seq) ? seq : 0)
-            .ToList();
+        // Sort by StageSequence (numeric)
+        stageResults = stageResults.OrderBy(s => s.StageSequence).ToList();
 
         // Get rally stages for stage names
         var stagesDict = new Dictionary<int, (string StageName, string StageType)>();
@@ -151,11 +149,10 @@ public class LeaderboardController : ControllerBase
         var stages = new List<object>();
         foreach (var sr in stageResults)
         {
-            int.TryParse(sr.StageSequence, out var seq);
-            stagesDict.TryGetValue(seq, out var stageInfo);
+            stagesDict.TryGetValue(sr.StageSequence, out var stageInfo);
             stages.Add(new
             {
-                stageSequence = seq,
+                stageSequence = sr.StageSequence,
                 stageName = stageInfo.StageName,
                 stageType = stageInfo.StageType,
                 timeSeconds = sr.TimeSeconds,
@@ -199,8 +196,8 @@ public class LeaderboardController : ControllerBase
             break;
         }
 
-        // Get stage results for SpecialStage type only (StageSequence stored as string)
-        var filter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq}' and StageType eq 'SpecialStage'";
+        // Get stage results for SpecialStage type only
+        var filter = $"PartitionKey eq '{id}' and StageSequence eq {stageSeq} and StageType eq 'SpecialStage'";
         var stageResults = new List<StageResultEntity>();
         await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: filter, maxPerPage: 200))
         {

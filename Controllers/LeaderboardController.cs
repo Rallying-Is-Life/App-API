@@ -130,7 +130,7 @@ public class LeaderboardController : ControllerBase
         }
 
         // Sort by StageSequence (numeric)
-        stageResults = stageResults.OrderBy(s => s.StageSequence).ToList();
+        stageResults = stageResults.OrderBy(s => s.StageSequenceInt).ToList();
 
         // Get rally stages for stage names
         var stagesDict = new Dictionary<int, (string StageName, string StageType)>();
@@ -149,10 +149,10 @@ public class LeaderboardController : ControllerBase
         var stages = new List<object>();
         foreach (var sr in stageResults)
         {
-            stagesDict.TryGetValue(sr.StageSequence, out var stageInfo);
+            stagesDict.TryGetValue(sr.StageSequenceInt, out var stageInfo);
             stages.Add(new
             {
-                stageSequence = sr.StageSequence,
+                stageSequence = sr.StageSequenceInt,
                 stageName = stageInfo.StageName,
                 stageType = stageInfo.StageType,
                 timeSeconds = sr.TimeSeconds,

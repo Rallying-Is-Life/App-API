@@ -139,8 +139,21 @@ public class LeaderboardController : ControllerBase
             var seq = entity.GetInt32("StageNumber") ?? 0;
             var name = entity.GetString("StageName") ?? string.Empty;
             var type = entity.GetString("StageType") ?? string.Empty;
-            var bogey = entity.GetInt32("BogeyTimeSeconds");
-            var max = entity.GetInt32("MaxTimeSeconds");
+            // App-Admin stores BogeyTime/MaxTime as TimeSpan
+            TimeSpan? bogeyTime = null;
+            TimeSpan? maxTime = null;
+            if (entity.TryGetValue("BogeyTime", out var bogeyObj))
+            {
+                if (bogeyObj is TimeSpan ts) bogeyTime = ts;
+                else if (bogeyObj is string s && TimeSpan.TryParse(s, out var parsed)) bogeyTime = parsed;
+            }
+            if (entity.TryGetValue("MaxTime", out var maxObj))
+            {
+                if (maxObj is TimeSpan ts) maxTime = ts;
+                else if (maxObj is string s && TimeSpan.TryParse(s, out var parsed)) maxTime = parsed;
+            }
+            var bogey = bogeyTime.HasValue ? (int?)bogeyTime.Value.TotalSeconds : null;
+            var max = maxTime.HasValue ? (int?)maxTime.Value.TotalSeconds : null;
             stagesDict[seq] = (name, type, bogey, max);
         }
 

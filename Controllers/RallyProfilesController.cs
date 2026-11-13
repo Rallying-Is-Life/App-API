@@ -108,8 +108,19 @@ public class RallyProfilesController : ControllerBase
             }
             var leg = entity.GetString("Leg") ?? string.Empty;
             var stageType = entity.GetString("StageType") ?? string.Empty;
-            var bogeyTime = entity.GetInt32("BogeyTimeSeconds");
-            var maxTime = entity.GetInt32("MaxTimeSeconds");
+            // App-Admin stores BogeyTime/MaxTime as TimeSpan
+            TimeSpan? bogeyTime = null;
+            TimeSpan? maxTime = null;
+            if (entity.TryGetValue("BogeyTime", out var bogeyObj))
+            {
+                if (bogeyObj is TimeSpan ts) bogeyTime = ts;
+                else if (bogeyObj is string s && TimeSpan.TryParse(s, out var parsed)) bogeyTime = parsed;
+            }
+            if (entity.TryGetValue("MaxTime", out var maxObj))
+            {
+                if (maxObj is TimeSpan ts) maxTime = ts;
+                else if (maxObj is string s && TimeSpan.TryParse(s, out var parsed)) maxTime = parsed;
+            }
             stages.Add(new StageInfo
             {
                 StageNumber = stageNum,
@@ -119,8 +130,8 @@ public class RallyProfilesController : ControllerBase
                 FlagUrl = flagUrl,
                 StageDate = stageDate,
                 Leg = leg,
-                BogeyTimeSeconds = bogeyTime,
-                MaxTimeSeconds = maxTime
+                BogeyTimeSeconds = bogeyTime.HasValue ? (int)bogeyTime.Value.TotalSeconds : null,
+                MaxTimeSeconds = maxTime.HasValue ? (int)maxTime.Value.TotalSeconds : null
             });
         }
 

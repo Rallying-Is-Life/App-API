@@ -6,11 +6,11 @@ namespace App_API.Models;
 public class StageResultEntity : TableEntityBase
 {
     public string StageId { get; set; } = string.Empty;
-    // Table stores StageSequence as string; bind to string property, expose int for API
-    public string StageSequenceRaw { get; set; } = string.Empty;
+    // Table stores StageSequence as string (e.g. "001"); bind to this name, expose int for API
+    public string StageSequence { get; set; } = string.Empty;
     
     [JsonIgnore]
-    public int StageSequence => int.TryParse(StageSequenceRaw, out var seq) ? seq : 0;
+    public int StageSequenceInt => int.TryParse(StageSequence, out var seq) ? seq : 0;
     
     public string StageType { get; set; } = string.Empty;
     public int? TimeSeconds { get; set; }

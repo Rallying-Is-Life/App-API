@@ -8,9 +8,10 @@ namespace App_API.Models
         public const string tblRallyStages = "tblRallyStages";
         public const string tblCarEventIndex = "tblCarEventIndex";
         public const string tblCars = "tblCars";
-public const string tblEventEntries = "tblEventEntries";
+        public const string tblEventEntries = "tblEventEntries";
+        public const string tblRallyLeaderboard = "tblRallyLeaderboard";
         public const string tblPeople = "tblPeople";
         public const string tblPersonEventIndex = "tblPersonEventIndex";
-            public const string tblReferenceValues = "tblReferenceValues";
+        public const string tblReferenceValues = "tblReferenceValues";
     }
 }

@@ -197,7 +197,7 @@ public class LeaderboardController : ControllerBase
         }
 
         // Get stage results for SpecialStage type only
-        var filter = $"PartitionKey eq '{id}' and StageSequence eq {stageSeq} and StageType eq 'SpecialStage'";
+        var filter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}' and StageType eq 'SpecialStage'";
         var stageResults = new List<StageResultEntity>();
         await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: filter, maxPerPage: 200))
         {

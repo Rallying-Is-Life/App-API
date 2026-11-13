@@ -1,11 +1,17 @@
 using Azure;
 using Azure.Data.Tables;
+using System.Text.Json.Serialization;
 namespace App_API.Models;
 
 public class StageResultEntity : TableEntityBase
 {
     public string StageId { get; set; } = string.Empty;
-    public int StageSequence { get; set; }
+    // Table stores StageSequence as string; bind to string property, expose int for API
+    public string StageSequenceRaw { get; set; } = string.Empty;
+    
+    [JsonIgnore]
+    public int StageSequence => int.TryParse(StageSequenceRaw, out var seq) ? seq : 0;
+    
     public string StageType { get; set; } = string.Empty;
     public int? TimeSeconds { get; set; }
     public int StagePenaltySeconds { get; set; }

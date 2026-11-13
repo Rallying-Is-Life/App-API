@@ -10,6 +10,7 @@ namespace App_API.Models
         public const string tblCars = "tblCars";
         public const string tblEventEntries = "tblEventEntries";
         public const string tblRallyLeaderboard = "tblRallyLeaderboard";
+        public const string tblStageResults = "tblStageResults";
         public const string tblPeople = "tblPeople";
         public const string tblPersonEventIndex = "tblPersonEventIndex";
         public const string tblReferenceValues = "tblReferenceValues";

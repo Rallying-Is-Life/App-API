@@ -133,13 +133,15 @@ public class LeaderboardController : ControllerBase
         stageResults = stageResults.OrderBy(s => s.StageSequenceInt).ToList();
 
         // Get rally stages for stage names
-        var stagesDict = new Dictionary<int, (string StageName, string StageType)>();
+        var stagesDict = new Dictionary<int, (string StageName, string StageType, int? BogeyTimeSeconds, int? MaxTimeSeconds)>();
         await foreach (var entity in rsClient.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}'", maxPerPage: 200))
         {
             var seq = entity.GetInt32("StageNumber") ?? 0;
             var name = entity.GetString("StageName") ?? string.Empty;
             var type = entity.GetString("StageType") ?? string.Empty;
-            stagesDict[seq] = (name, type);
+            var bogey = entity.GetInt32("BogeyTimeSeconds");
+            var max = entity.GetInt32("MaxTimeSeconds");
+            stagesDict[seq] = (name, type, bogey, max);
         }
 
         // Get leaderboard summary for this entrant
@@ -159,7 +161,9 @@ public class LeaderboardController : ControllerBase
                 status = sr.Status,
                 retirementReason = sr.RetirementReason,
                 bogeyTimeHit = sr.BogeyTimeHit,
-                maxTimeHit = sr.MaxTimeHit
+                maxTimeHit = sr.MaxTimeHit,
+                bogeyTimeSeconds = stageInfo.BogeyTimeSeconds,
+                maxTimeSeconds = stageInfo.MaxTimeSeconds
             });
         }
 

@@ -25,6 +25,8 @@ public class StageInfo
     public string FlagUrl { get; set; } = string.Empty;
     public DateTimeOffset? StageDate { get; set; }
     public string? Leg { get; set; }
+    public int? BogeyTimeSeconds { get; set; }
+    public int? MaxTimeSeconds { get; set; }
 }
 public class StageEntity : TableEntityBase
 {
@@ -35,4 +37,6 @@ public class StageEntity : TableEntityBase
     public string? Country { get; set; } = string.Empty;
     public string? Region { get; set; } = string.Empty;
     public string? FlagCode { get; set; } = string.Empty;
+    public int? BogeyTimeSeconds { get; set; }
+    public int? MaxTimeSeconds { get; set; }
 }

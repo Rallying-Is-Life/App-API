@@ -108,6 +108,8 @@ public class RallyProfilesController : ControllerBase
             }
             var leg = entity.GetString("Leg") ?? string.Empty;
             var stageType = entity.GetString("StageType") ?? string.Empty;
+            var bogeyTime = entity.GetInt32("BogeyTimeSeconds");
+            var maxTime = entity.GetInt32("MaxTimeSeconds");
             stages.Add(new StageInfo
             {
                 StageNumber = stageNum,
@@ -116,7 +118,9 @@ public class RallyProfilesController : ControllerBase
                 StageType = stageType,
                 FlagUrl = flagUrl,
                 StageDate = stageDate,
-                Leg = leg
+                Leg = leg,
+                BogeyTimeSeconds = bogeyTime,
+                MaxTimeSeconds = maxTime
             });
         }
 

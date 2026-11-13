@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Azure.Data.Tables;
 using Azure.Identity;
-using System.Linq;
+using System.Text.Json;
 
 namespace App_API.Controllers;
 
@@ -11,144 +11,314 @@ namespace App_API.Controllers;
 [AllowAnonymous]
 public class LeaderboardController : ControllerBase
 {
-    // GET /leaderboard?id=<rallyRowKey>[&classId=<c>]
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private TableClient GetLeaderboardClient() => new(
+        new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+        TableNames.tblRallyLeaderboard,
+        new DefaultAzureCredential());
+
+    private TableClient GetStageResultsClient() => new(
+        new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+        TableNames.tblStageResults,
+        new DefaultAzureCredential());
+
+    private TableClient GetEventEntriesClient() => new(
+        new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+        TableNames.tblEventEntries,
+        new DefaultAzureCredential());
+
+    private TableClient GetRallyStagesClient() => new(
+        new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+        TableNames.tblRallyStages,
+        new DefaultAzureCredential());
+
+    // GET /leaderboard?id=<rallyRowKey>[&classId=<classId>]
     [HttpGet]
     public async Task<IActionResult> GetLeaderboard([FromQuery] string id, [FromQuery] string? classId)
     {
         if (string.IsNullOrEmpty(id))
             return BadRequest("id parameter is required");
 
-        var storageUri = Environment.GetEnvironmentVariable("azureStorageUri");
-        if (string.IsNullOrEmpty(storageUri))
-            return StatusCode(500, "Storage URI not configured");
+        var lbClient = GetLeaderboardClient();
+        var eeClient = GetEventEntriesClient();
 
-        // Query leaderboard entries for this rally
-        var leaderboardClient = new TableClient(
-            new Uri(storageUri),
-            TableNames.tblRallyLeaderboard,
-            new DefaultAzureCredential());
+        var filter = $"PartitionKey eq '{id}'";
+        if (!string.IsNullOrEmpty(classId))
+            filter += $" and ClassId eq '{classId}'";
 
-        var leaderboardEntries = new List<LeaderboardEntry>();
-        await foreach (var entity in leaderboardClient.QueryAsync<TableEntity>(
-            filter: $"PartitionKey eq '{id}'",
-            maxPerPage: 200))
+        var leaderboard = new List<RallyLeaderboardEntity>();
+        await foreach (var entity in lbClient.QueryAsync<RallyLeaderboardEntity>(filter: filter, maxPerPage: 200))
         {
-            leaderboardEntries.Add(new LeaderboardEntry
+            leaderboard.Add(entity);
+        }
+
+        if (leaderboard.Count == 0)
+            return Ok(new { rallyRowKey = id, count = 0, items = Array.Empty<object>() });
+
+        var entrantIds = leaderboard.Select(l => l.RowKey).ToList();
+        var entries = new Dictionary<string, EventEntryTableEntity>();
+        foreach (var eid in entrantIds)
+        {
+            try
             {
-                EntrantId = entity.RowKey ?? string.Empty,
-                TotalTimeSeconds = entity.GetInt32("TotalTimeSeconds"),
-                StagesCompleted = entity.GetInt32("StagesCompleted") ?? 0,
-                TotalStages = entity.GetInt32("TotalStages") ?? 0,
-                OverallPosition = entity.GetInt32("OverallPosition"),
-                ClassPosition = entity.GetInt32("ClassPosition"),
-                ClassId = entity.GetString("ClassId") ?? string.Empty,
-                Status = entity.GetString("Status") ?? string.Empty,
-                GapToOverallLeaderSeconds = entity.GetInt32("GapToOverallLeaderSeconds"),
-                GapToCarInFrontSeconds = entity.GetInt32("GapToCarInFrontSeconds"),
-                GapToClassLeaderSeconds = entity.GetInt32("GapToClassLeaderSeconds"),
-                GapToNextInClassSeconds = entity.GetInt32("GapToNextInClassSeconds")
+                var resp = await eeClient.GetEntityIfExistsAsync<EventEntryTableEntity>(id, eid);
+                if (resp.HasValue)
+                    entries[eid] = resp.Value;
+            }
+            catch { }
+        }
+
+        // Sort: finishers first (StagesCompleted == TotalStages) by OverallPosition asc,
+        // then retirees by StagesCompleted desc, TotalTimeSeconds asc
+        var sorted = leaderboard
+            .OrderBy(l => l.StagesCompleted == l.TotalStages ? 0 : 1)
+            .ThenBy(l => l.OverallPosition ?? int.MaxValue)
+            .ThenByDescending(l => l.StagesCompleted)
+            .ThenBy(l => l.TotalTimeSeconds ?? int.MaxValue)
+            .ToList();
+
+        var items = new List<object>();
+        foreach (var l in sorted)
+        {
+            entries.TryGetValue(l.RowKey, out var entry);
+            items.Add(new
+            {
+                overallPosition = l.OverallPosition,
+                classPosition = l.ClassPosition,
+                entrantId = l.RowKey,
+                driverName = entry?.DriverName ?? string.Empty,
+                coDriverName = entry?.CoDriverName ?? string.Empty,
+                raceNumber = entry?.RaceNumber ?? string.Empty,
+                raceClass = entry?.RaceClass ?? string.Empty,
+                carMake = entry?.CarMake ?? string.Empty,
+                carModel = entry?.CarModel ?? string.Empty,
+                totalTimeSeconds = l.TotalTimeSeconds,
+                stagesCompleted = l.StagesCompleted,
+                totalStages = l.TotalStages,
+                status = l.Status,
+                gapToOverallLeaderSeconds = l.GapToOverallLeaderSeconds,
+                gapToCarInFrontSeconds = l.GapToCarInFrontSeconds,
+                gapToClassLeaderSeconds = l.GapToClassLeaderSeconds,
+                gapToNextInClassSeconds = l.GapToNextInClassSeconds
             });
         }
 
-        if (!leaderboardEntries.Any())
-            return Ok(new { rallyRowKey = id, count = 0, items = new List<object>() });
+        return Ok(new { rallyRowKey = id, count = items.Count, items });
+    }
 
-        // Filter by classId if provided
-        if (!string.IsNullOrEmpty(classId))
+    // GET /leaderboard/entrant?id=<rallyRowKey>&entrantId=<e>
+    [HttpGet("entrant")]
+    public async Task<IActionResult> GetEntrantDetail([FromQuery] string id, [FromQuery] string entrantId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(entrantId))
+            return BadRequest("id and entrantId parameters are required");
+
+        var srClient = GetStageResultsClient();
+        var rsClient = GetRallyStagesClient();
+        var lbClient = GetLeaderboardClient();
+
+        // Get stage results for this entrant
+        var filter = $"PartitionKey eq '{id}' and RowKey ge '{entrantId}_' and RowKey lt '{entrantId}0'";
+        var stageResults = new List<StageResultEntity>();
+        await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: filter, maxPerPage: 200))
         {
-            leaderboardEntries = leaderboardEntries.Where(e => 
-                e.ClassId.Equals(classId, StringComparison.OrdinalIgnoreCase)).ToList();
+            stageResults.Add(entity);
         }
 
-        // Get entrant details from tblEventEntries
-        var entriesClient = new TableClient(
-            new Uri(storageUri),
-            TableNames.tblEventEntries,
-            new DefaultAzureCredential());
+        // Sort by StageSequence
+        stageResults = stageResults.OrderBy(s => s.StageSequence).ToList();
 
-        var entrantDetails = new Dictionary<string, EntrantDetail>();
-        await foreach (var entity in entriesClient.QueryAsync<TableEntity>(
-            filter: $"PartitionKey eq '{id}'",
-            maxPerPage: 200))
+        // Get rally stages for stage names
+        var stagesDict = new Dictionary<int, (string StageName, string StageType)>();
+        await foreach (var entity in rsClient.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}'", maxPerPage: 200))
         {
-            var entryRowKey = entity.RowKey ?? string.Empty;
-            entrantDetails[entryRowKey] = new EntrantDetail
-            {
-                DriverName = entity.GetString("DriverName") ?? string.Empty,
-                CoDriverName = entity.GetString("CoDriverName") ?? string.Empty,
-                CarMake = entity.GetString("CarMake") ?? string.Empty,
-                CarModel = entity.GetString("CarModel") ?? string.Empty,
-                RaceNumber = entity.GetString("RaceNumber") ?? string.Empty,
-                RaceClass = entity.GetString("RaceClass") ?? string.Empty
-            };
+            var seq = entity.GetInt32("StageNumber") ?? 0;
+            var name = entity.GetString("StageName") ?? string.Empty;
+            var type = entity.GetString("StageType") ?? string.Empty;
+            stagesDict[seq] = (name, type);
         }
 
-        // Join and build response items
-        var responseItems = new List<object>();
-        foreach (var lb in leaderboardEntries)
+        // Get leaderboard summary for this entrant
+        var lbResp = await lbClient.GetEntityIfExistsAsync<RallyLeaderboardEntity>(id, entrantId);
+        var leaderboard = lbResp.HasValue ? lbResp.Value : null;
+
+        var stages = new List<object>();
+        foreach (var sr in stageResults)
         {
-            entrantDetails.TryGetValue(lb.EntrantId, out var detail);
-            
-            var item = new
+            stagesDict.TryGetValue(sr.StageSequence, out var stageInfo);
+            stages.Add(new
             {
-                overallPosition = lb.OverallPosition,
-                classPosition = lb.ClassPosition,
-                entrantId = lb.EntrantId,
-                driverName = detail?.DriverName ?? string.Empty,
-                coDriverName = detail?.CoDriverName ?? string.Empty,
-                raceNumber = detail?.RaceNumber ?? string.Empty,
-                raceClass = detail?.RaceClass ?? string.Empty,
-                carMake = detail?.CarMake ?? string.Empty,
-                carModel = detail?.CarModel ?? string.Empty,
-                totalTimeSeconds = lb.TotalTimeSeconds,
-                stagesCompleted = lb.StagesCompleted,
-                totalStages = lb.TotalStages,
-                status = lb.Status,
-                gapToOverallLeaderSeconds = lb.GapToOverallLeaderSeconds,
-                gapToCarInFrontSeconds = lb.GapToCarInFrontSeconds,
-                gapToClassLeaderSeconds = lb.GapToClassLeaderSeconds,
-                gapToNextInClassSeconds = lb.GapToNextInClassSeconds
-            };
-            responseItems.Add(item);
+                stageSequence = sr.StageSequence.ToString("D3"),
+                stageName = stageInfo.StageName,
+                stageType = stageInfo.StageType,
+                timeSeconds = sr.TimeSeconds,
+                status = sr.Status,
+                retirementReason = sr.RetirementReason,
+                bogeyTimeHit = sr.BogeyTimeHit,
+                maxTimeHit = sr.MaxTimeHit
+            });
         }
 
-        // Sort by OverallPosition asc (finishers first, then retirees)
-        // OverallPosition is null for non-finishers; they sort after finishers
-        var sortedItems = responseItems
-            .OrderBy(i => 
+        return Ok(new
+        {
+            rallyRowKey = id,
+            entrantId,
+            totalTimeSeconds = leaderboard?.TotalTimeSeconds,
+            stagesCompleted = leaderboard?.StagesCompleted ?? 0,
+            totalStages = leaderboard?.TotalStages ?? 0,
+            status = leaderboard?.Status ?? string.Empty,
+            stages
+        });
+    }
+
+    // GET /leaderboard/stage?id=<rallyRowKey>&stageSeq=<n>[&classId=<classId>]
+    [HttpGet("stage")]
+    public async Task<IActionResult> GetStageResults([FromQuery] string id, [FromQuery] int stageSeq, [FromQuery] string? classId)
+    {
+        if (string.IsNullOrEmpty(id))
+            return BadRequest("id parameter is required");
+
+        var srClient = GetStageResultsClient();
+        var eeClient = GetEventEntriesClient();
+        var rsClient = GetRallyStagesClient();
+
+        // Get stage name/type from tblRallyStages
+        string stageName = string.Empty;
+        string stageType = string.Empty;
+        await foreach (var entity in rsClient.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}' and StageNumber eq {stageSeq}", maxPerPage: 1))
+        {
+            stageName = entity.GetString("StageName") ?? string.Empty;
+            stageType = entity.GetString("StageType") ?? string.Empty;
+            break;
+        }
+
+        // Get stage results for SpecialStage type only
+        var filter = $"PartitionKey eq '{id}' and StageSequence eq {stageSeq} and StageType eq 'SpecialStage'";
+        var stageResults = new List<StageResultEntity>();
+        await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: filter, maxPerPage: 200))
+        {
+            stageResults.Add(entity);
+        }
+
+        if (stageResults.Count == 0)
+            return Ok(new { stageSequence = stageSeq, stageName, items = Array.Empty<object>() });
+
+        // Get entries for driver/co-driver/car info
+        var entrantIds = stageResults.Select(s => s.RowKey.Split('_')[0]).Distinct().ToList();
+        var entries = new Dictionary<string, EventEntryTableEntity>();
+        foreach (var eid in entrantIds)
+        {
+            try
             {
-                var pos = (int?)i.GetType().GetProperty("overallPosition")?.GetValue(i);
-                return pos ?? int.MaxValue;
-            })
-            .ThenBy(i => (int?)i.GetType().GetProperty("classPosition")?.GetValue(i) ?? int.MaxValue)
+                var resp = await eeClient.GetEntityIfExistsAsync<EventEntryTableEntity>(id, eid);
+                if (resp.HasValue)
+                {
+                    var entry = resp.Value;
+                    if (string.IsNullOrEmpty(classId) || entry.Class == classId)
+                        entries[eid] = entry;
+                }
+            }
+            catch { }
+        }
+
+        // Sort by TimeSeconds asc (null last)
+        var sorted = stageResults
+            .Where(s => entries.ContainsKey(s.RowKey.Split('_')[0]))
+            .OrderBy(s => s.TimeSeconds ?? int.MaxValue)
             .ToList();
 
-        return Ok(new { rallyRowKey = id, count = sortedItems.Count, items = sortedItems });
+        var items = new List<object>();
+        int position = 0;
+        foreach (var sr in sorted)
+        {
+            var eid = sr.RowKey.Split('_')[0];
+            entries.TryGetValue(eid, out var entry);
+            if (entry == null) continue;
+
+            position++;
+            items.Add(new
+            {
+                position,
+                entrantId = eid,
+                driverName = entry.DriverName,
+                coDriverName = entry.CoDriverName,
+                raceNumber = entry.RaceNumber,
+                raceClass = entry.RaceClass,
+                timeSeconds = sr.TimeSeconds,
+                status = sr.Status
+            });
+        }
+
+        return Ok(new { stageSequence = stageSeq, stageName, items });
     }
 
-    private class LeaderboardEntry
+    // GET /leaderboard/retirements?id=<rallyRowKey>[&classId=<classId>]
+    [HttpGet("retirements")]
+    public async Task<IActionResult> GetRetirements([FromQuery] string id, [FromQuery] string? classId)
     {
-        public string EntrantId { get; set; } = string.Empty;
-        public int? TotalTimeSeconds { get; set; }
-        public int StagesCompleted { get; set; }
-        public int TotalStages { get; set; }
-        public int? OverallPosition { get; set; }
-        public int? ClassPosition { get; set; }
-        public string ClassId { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public int? GapToOverallLeaderSeconds { get; set; }
-        public int? GapToCarInFrontSeconds { get; set; }
-        public int? GapToClassLeaderSeconds { get; set; }
-        public int? GapToNextInClassSeconds { get; set; }
-    }
+        if (string.IsNullOrEmpty(id))
+            return BadRequest("id parameter is required");
 
-    private class EntrantDetail
-    {
-        public string DriverName { get; set; } = string.Empty;
-        public string CoDriverName { get; set; } = string.Empty;
-        public string CarMake { get; set; } = string.Empty;
-        public string CarModel { get; set; } = string.Empty;
-        public string RaceNumber { get; set; } = string.Empty;
-        public string RaceClass { get; set; } = string.Empty;
+        var lbClient = GetLeaderboardClient();
+        var eeClient = GetEventEntriesClient();
+
+        var filter = $"PartitionKey eq '{id}' and Status ne 'Finished'";
+        var leaderboard = new List<RallyLeaderboardEntity>();
+        await foreach (var entity in lbClient.QueryAsync<RallyLeaderboardEntity>(filter: filter, maxPerPage: 200))
+        {
+            leaderboard.Add(entity);
+        }
+
+        if (leaderboard.Count == 0)
+            return Ok(new { rallyRowKey = id, count = 0, items = Array.Empty<object>() });
+
+        var entrantIds = leaderboard.Select(l => l.RowKey).ToList();
+        var entries = new Dictionary<string, EventEntryTableEntity>();
+        foreach (var eid in entrantIds)
+        {
+            try
+            {
+                var resp = await eeClient.GetEntityIfExistsAsync<EventEntryTableEntity>(id, eid);
+                if (resp.HasValue)
+                {
+                    var entry = resp.Value;
+                    if (string.IsNullOrEmpty(classId) || entry.Class == classId)
+                        entries[eid] = entry;
+                }
+            }
+            catch { }
+        }
+
+        // Sort: StagesCompleted desc, then TotalTimeSeconds asc
+        var sorted = leaderboard
+            .Where(l => entries.ContainsKey(l.RowKey))
+            .OrderByDescending(l => l.StagesCompleted)
+            .ThenBy(l => l.TotalTimeSeconds ?? int.MaxValue)
+            .ToList();
+
+        var items = new List<object>();
+        foreach (var l in sorted)
+        {
+            entries.TryGetValue(l.RowKey, out var entry);
+            if (entry == null) continue;
+
+            items.Add(new
+            {
+                entrantId = l.RowKey,
+                driverName = entry?.DriverName ?? string.Empty,
+                coDriverName = entry?.CoDriverName ?? string.Empty,
+                raceNumber = entry?.RaceNumber ?? string.Empty,
+                raceClass = entry?.RaceClass ?? string.Empty,
+                status = l.Status,
+                retirementReason = l.Status,
+                stagesCompleted = l.StagesCompleted
+            });
+        }
+
+        return Ok(new { rallyRowKey = id, count = items.Count, items });
     }
 }

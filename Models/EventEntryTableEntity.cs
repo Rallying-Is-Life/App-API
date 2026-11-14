@@ -6,6 +6,8 @@ public class EventEntryTableEntity : TableEntityBase
 {
     public string DriverName { get; set; } = string.Empty;
     public string CoDriverName { get; set; } = string.Empty;
+    public string DriverNat { get; set; } = string.Empty;
+    public string CoDriverNat { get; set; } = string.Empty;
     public string CarMake { get; set; } = string.Empty;
     public string CarModel { get; set; } = string.Empty;
     public string VRM { get; set; } = string.Empty;

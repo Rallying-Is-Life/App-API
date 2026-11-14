@@ -93,6 +93,8 @@ public class LeaderboardController : ControllerBase
                 entrantId = l.RowKey,
                 driverName = entry?.DriverName ?? string.Empty,
                 coDriverName = entry?.CoDriverName ?? string.Empty,
+                driverNat = entry?.DriverNat ?? string.Empty,
+                coDriverNat = entry?.CoDriverNat ?? string.Empty,
                 raceNumber = entry?.RaceNumber ?? string.Empty,
                 raceClass = entry?.RaceClass ?? string.Empty,
                 carMake = entry?.CarMake ?? string.Empty,

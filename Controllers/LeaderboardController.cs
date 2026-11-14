@@ -32,6 +32,50 @@ public class LeaderboardController : ControllerBase
         TableNames.tblEventEntries,
         new DefaultAzureCredential());
 
+    private TableClient GetPeopleClient() => new(
+        new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+        TableNames.tblPeople,
+        new DefaultAzureCredential());
+
+    private async Task<(string Country, string Region)> GetPersonNationality(string personRowKey)
+    {
+        if (string.IsNullOrEmpty(personRowKey))
+            return (string.Empty, string.Empty);
+        
+        try
+        {
+            var resp = await GetPeopleClient().GetEntityIfExistsAsync<TableEntity>("tblPeople", personRowKey);
+            if (resp.HasValue)
+            {
+                var country = resp.Value.GetString("Country") ?? string.Empty;
+                var region = resp.Value.GetString("Region") ?? string.Empty;
+                return (country, region);
+            }
+        }
+        catch { }
+        return (string.Empty, string.Empty);
+    }
+
+    private string ParseFlagCode(string country, string region)
+    {
+        if (string.IsNullOrEmpty(country))
+            return string.Empty;
+        if (country.Equals("GB", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrEmpty(region))
+                return "gb";
+            switch (region.ToLower())
+            {
+                case "wales": return "gb-wls";
+                case "scotland": return "gb-sct";
+                case "england": return "gb-eng";
+                case "northern ireland": case "ni": return "gb-nir";
+                default: return "gb";
+            }
+        }
+        return country.ToLower();
+    }
+
     private TableClient GetRallyStagesClient() => new(
         new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
         TableNames.tblRallyStages,
@@ -86,6 +130,31 @@ public class LeaderboardController : ControllerBase
         foreach (var l in sorted)
         {
             entries.TryGetValue(l.RowKey, out var entry);
+
+            // Get driver nationality from tblPeople
+            var driverCountry = string.Empty;
+            var driverRegion = string.Empty;
+            if (!string.IsNullOrEmpty(entry?.DriverPersonRowKey))
+            {
+                (driverCountry, driverRegion) = await GetPersonNationality(entry.DriverPersonRowKey);
+            }
+            else if (!string.IsNullOrEmpty(entry?.DriverNat))
+            {
+                driverCountry = entry.DriverNat;
+            }
+
+            // Get co-driver nationality from tblPeople
+            var coDriverCountry = string.Empty;
+            var coDriverRegion = string.Empty;
+            if (!string.IsNullOrEmpty(entry?.CoDriverPersonRowKey))
+            {
+                (coDriverCountry, coDriverRegion) = await GetPersonNationality(entry.CoDriverPersonRowKey);
+            }
+            else if (!string.IsNullOrEmpty(entry?.CoDriverNat))
+            {
+                coDriverCountry = entry.CoDriverNat;
+            }
+
             items.Add(new
             {
                 overallPosition = l.OverallPosition,
@@ -93,8 +162,8 @@ public class LeaderboardController : ControllerBase
                 entrantId = l.RowKey,
                 driverName = entry?.DriverName ?? string.Empty,
                 coDriverName = entry?.CoDriverName ?? string.Empty,
-                driverNat = entry?.DriverNat ?? string.Empty,
-                coDriverNat = entry?.CoDriverNat ?? string.Empty,
+                driverNat = driverCountry,
+                coDriverNat = coDriverCountry,
                 raceNumber = entry?.RaceNumber ?? string.Empty,
                 raceClass = entry?.RaceClass ?? string.Empty,
                 carMake = entry?.CarMake ?? string.Empty,

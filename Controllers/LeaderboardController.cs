@@ -139,7 +139,7 @@ public class LeaderboardController : ControllerBase
         {
             var seq = entity.GetInt32("StageNumber") ?? 0;
             var name = entity.GetString("StageName") ?? string.Empty;
-            var type = entity.GetString("StageType") ?? string.Empty;
+            var surface = entity.GetString("Surface") ?? string.Empty;
             // App-Admin stores BogeyTime/MaxTime as TimeSpan (stored as ISO 8601 duration string in Table Storage)
             TimeSpan? bogeyTime = null;
             TimeSpan? maxTime = null;
@@ -161,7 +161,7 @@ public class LeaderboardController : ControllerBase
             }
             var bogey = bogeyTime.HasValue ? (int?)bogeyTime.Value.TotalSeconds : null;
             var max = maxTime.HasValue ? (int?)maxTime.Value.TotalSeconds : null;
-            stagesDict[seq] = (name, type, bogey, max);
+            stagesDict[seq] = (name, surface, bogey, max);
         }
 
         // Get leaderboard summary for this entrant

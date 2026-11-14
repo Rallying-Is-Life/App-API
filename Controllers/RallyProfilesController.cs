@@ -108,7 +108,7 @@ public class RallyProfilesController : ControllerBase
                     stageDate = parsed;
             }
             var leg = entity.GetString("Leg") ?? string.Empty;
-            var stageType = entity.GetString("StageType") ?? string.Empty;
+            var surface = entity.GetString("Surface") ?? string.Empty;
             // App-Admin stores BogeyTime/MaxTime as TimeSpan (stored as ISO 8601 duration string in Table Storage)
             TimeSpan? bogeyTime = null;
             TimeSpan? maxTime = null;
@@ -133,7 +133,7 @@ public class RallyProfilesController : ControllerBase
                 StageNumber = stageNum,
                 StageName = entity.GetString("StageName") ?? entity.RowKey ?? "",
                 StageLength = stageLengthDisplay,
-                StageType = stageType,
+                StageType = surface,
                 FlagUrl = flagUrl,
                 StageDate = stageDate,
                 Leg = leg,

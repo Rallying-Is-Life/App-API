@@ -38,23 +38,43 @@ public class LeaderboardController : ControllerBase
         new DefaultAzureCredential());
 
     private async Task<(string Country, string Region)> GetPersonNationality(string personRowKey)
-    {
-        if (string.IsNullOrEmpty(personRowKey))
-            return (string.Empty, string.Empty);
-        
-        try
-        {
-            var resp = await GetPeopleClient().GetEntityIfExistsAsync<TableEntity>("tblPeople", personRowKey);
-            if (resp.HasValue)
             {
-                var country = resp.Value.GetString("Country") ?? string.Empty;
-                var region = resp.Value.GetString("Region") ?? string.Empty;
-                return (country, region);
+                if (string.IsNullOrEmpty(personRowKey))
+                    return (string.Empty, string.Empty);
+            
+                try
+                {
+                    var resp = await GetPeopleClient().GetEntityIfExistsAsync<TableEntity>("tblPeople", personRowKey);
+                    if (resp.HasValue)
+                    {
+                        var country = resp.Value.GetString("Country") ?? string.Empty;
+                        var region = resp.Value.GetString("Region") ?? string.Empty;
+                        return (country, region);
+                    }
+                }
+                catch { }
+                return (string.Empty, string.Empty);
             }
-        }
-        catch { }
-        return (string.Empty, string.Empty);
-    }
+
+            private async Task<(string Country, string Region)> GetPersonNationalityByName(string firstName, string surname)
+            {
+                if (string.IsNullOrEmpty(firstName) || string.IsNullOrEmpty(surname))
+                    return (string.Empty, string.Empty);
+            
+                try
+                {
+                    var filter = $"FirstName eq '{firstName}' and Surname eq '{surname}'";
+                    await foreach (var entity in GetPeopleClient().QueryAsync<TableEntity>(filter: filter, maxPerPage: 5))
+                    {
+                        var country = entity.GetString("Country") ?? string.Empty;
+                        var region = entity.GetString("Region") ?? string.Empty;
+                        if (!string.IsNullOrEmpty(country))
+                            return (country, region);
+                    }
+                }
+                catch { }
+                return (string.Empty, string.Empty);
+            }
 
     private string ParseFlagCode(string country, string region)
     {
@@ -138,6 +158,13 @@ public class LeaderboardController : ControllerBase
             {
                 (driverCountry, driverRegion) = await GetPersonNationality(entry.DriverPersonRowKey);
             }
+            else if (!string.IsNullOrEmpty(entry?.DriverName))
+            {
+                var parts = entry.DriverName.Split(' ', 2);
+                var first = parts.Length > 0 ? parts[0] : string.Empty;
+                var last = parts.Length > 1 ? parts[1] : string.Empty;
+                (driverCountry, driverRegion) = await GetPersonNationalityByName(first, last);
+            }
             else if (!string.IsNullOrEmpty(entry?.DriverNat))
             {
                 driverCountry = entry.DriverNat;
@@ -149,6 +176,13 @@ public class LeaderboardController : ControllerBase
             if (!string.IsNullOrEmpty(entry?.CoDriverPersonRowKey))
             {
                 (coDriverCountry, coDriverRegion) = await GetPersonNationality(entry.CoDriverPersonRowKey);
+            }
+            else if (!string.IsNullOrEmpty(entry?.CoDriverName))
+            {
+                var parts = entry.CoDriverName.Split(' ', 2);
+                var first = parts.Length > 0 ? parts[0] : string.Empty;
+                var last = parts.Length > 1 ? parts[1] : string.Empty;
+                (coDriverCountry, coDriverRegion) = await GetPersonNationalityByName(first, last);
             }
             else if (!string.IsNullOrEmpty(entry?.CoDriverNat))
             {

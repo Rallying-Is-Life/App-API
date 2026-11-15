@@ -21,6 +21,7 @@ var eventClient = new TableClient(new Uri(Environment.GetEnvironmentVariable("az
 var rallies = new List<object>();
 foreach (var e in idxList.OrderBy(x => x.EventDate)) {
     string rallyRowKey = e.RowKey; // default fallback
+    string entrantId = e.EventRowKey; // tblEventEntries.RowKey == leaderboard entrantId
     try {
         var entryQuery = eventClient.Query<TableEntity>(filter: $"RowKey eq '{e.EventRowKey}'");
         foreach (var ent in entryQuery) { rallyRowKey = ent.PartitionKey ?? e.RowKey; break; }
@@ -28,7 +29,8 @@ foreach (var e in idxList.OrderBy(x => x.EventDate)) {
     rallies.Add(new {
         year = e.EventYear > 0 ? e.EventYear : (e.EventDate?.Year ?? 0),
         rallyName = (!string.IsNullOrEmpty(e.EventName) ? e.EventName : (e.RowKey ?? "—")),
-        rallyRowKey = rallyRowKey
+        rallyRowKey = rallyRowKey,
+        entrantId = entrantId
     });
 }
 return Ok(new {

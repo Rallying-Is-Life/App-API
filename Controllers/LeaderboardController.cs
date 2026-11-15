@@ -180,6 +180,40 @@ public class LeaderboardController : ControllerBase
             });
         }
 
+        // Get event entry for this entrant to resolve nationality
+        var eeClient = GetEventEntriesClient();
+        var entryResp = await eeClient.GetEntityIfExistsAsync<EventEntryTableEntity>(id, entrantId);
+        var entry = entryResp.HasValue ? entryResp.Value : null;
+
+        // Resolve driver/co-driver nationality from event entry or people table
+        string driverNat = string.Empty;
+        string coDriverNat = string.Empty;
+        if (entry != null)
+        {
+            if (!string.IsNullOrEmpty(entry.DriverNat))
+                driverNat = entry.DriverNat;
+            else if (!string.IsNullOrEmpty(entry.DriverPersonRowKey))
+            {
+                var peopleClient = GetPeopleClient();
+                await foreach (var person in peopleClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{entry.DriverPersonRowKey}'"))
+                {
+                    driverNat = person.GetString("Country") ?? string.Empty;
+                    break;
+                }
+            }
+            if (!string.IsNullOrEmpty(entry.CoDriverNat))
+                coDriverNat = entry.CoDriverNat;
+            else if (!string.IsNullOrEmpty(entry.CoDriverPersonRowKey))
+            {
+                var peopleClient = GetPeopleClient();
+                await foreach (var person in peopleClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{entry.CoDriverPersonRowKey}'"))
+                {
+                    coDriverNat = person.GetString("Country") ?? string.Empty;
+                    break;
+                }
+            }
+        }
+
         return Ok(new
         {
             rallyRowKey = id,
@@ -188,6 +222,8 @@ public class LeaderboardController : ControllerBase
             stagesCompleted = leaderboard?.StagesCompleted ?? 0,
             totalStages = leaderboard?.TotalStages ?? 0,
             status = leaderboard?.Status ?? string.Empty,
+            driverNat = driverNat,
+            coDriverNat = coDriverNat,
             stages
         });
     }

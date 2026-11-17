@@ -4,7 +4,7 @@ namespace App_API.Models;
 
 public class RallyLeaderboardEntity : TableEntityBase
 {
-    public int? TotalTimeSeconds { get; set; }
+    public double? TotalTimeSeconds { get; set; }
     public int StagesCompleted { get; set; }
     public int TotalStages { get; set; }
     public int? OverallPosition { get; set; }
@@ -12,8 +12,8 @@ public class RallyLeaderboardEntity : TableEntityBase
     public string? ClassId { get; set; }
     public DateTimeOffset LastUpdated { get; set; }
     public string Status { get; set; } = string.Empty;
-    public int? GapToOverallLeaderSeconds { get; set; }
-    public int? GapToCarInFrontSeconds { get; set; }
-    public int? GapToClassLeaderSeconds { get; set; }
-    public int? GapToNextInClassSeconds { get; set; }
+    public double? GapToOverallLeaderSeconds { get; set; }
+    public double? GapToCarInFrontSeconds { get; set; }
+    public double? GapToClassLeaderSeconds { get; set; }
+    public double? GapToNextInClassSeconds { get; set; }
 }

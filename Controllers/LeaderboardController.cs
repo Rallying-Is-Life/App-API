@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Azure.Data.Tables;
 using Azure.Identity;
 using System.Text.Json;
+using System.Xml;
 
 namespace App_API.Controllers;
 
@@ -30,6 +31,70 @@ public class LeaderboardController : ControllerBase
         new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
         TableNames.tblEventEntries,
         new DefaultAzureCredential());
+
+    private TableClient GetPeopleClient() => new(
+        new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
+        TableNames.tblPeople,
+        new DefaultAzureCredential());
+
+    private async Task<(string Country, string Region)> GetPersonNationality(string personRowKey)
+            {
+                if (string.IsNullOrEmpty(personRowKey))
+                    return (string.Empty, string.Empty);
+           
+                try
+                {
+                    var resp = await GetPeopleClient().GetEntityIfExistsAsync<TableEntity>("tblPeople", personRowKey);
+                    if (resp.HasValue)
+                    {
+                        var country = resp.Value.GetString("Country") ?? string.Empty;
+                        var region = resp.Value.GetString("Region") ?? string.Empty;
+                        return (country, region);
+                    }
+                }
+                catch { }
+                return (string.Empty, string.Empty);
+            }
+
+            private async Task<(string Country, string Region)> GetPersonNationalityByName(string firstName, string surname)
+            {
+                if (string.IsNullOrEmpty(firstName) || string.IsNullOrEmpty(surname))
+                    return (string.Empty, string.Empty);
+           
+                try
+                {
+                    var filter = $"FirstName eq '{firstName}' and Surname eq '{surname}'";
+                    await foreach (var entity in GetPeopleClient().QueryAsync<TableEntity>(filter: filter, maxPerPage: 5))
+                    {
+                        var country = entity.GetString("Country") ?? string.Empty;
+                        var region = entity.GetString("Region") ?? string.Empty;
+                        if (!string.IsNullOrEmpty(country))
+                            return (country, region);
+                    }
+                }
+                catch { }
+                return (string.Empty, string.Empty);
+            }
+
+    private string ParseFlagCode(string country, string region)
+    {
+        if (string.IsNullOrEmpty(country))
+            return string.Empty;
+        if (country.Equals("GB", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrEmpty(region))
+                return "gb";
+            switch (region.ToLower())
+            {
+                case "wales": return "gb-wls";
+                case "scotland": return "gb-sct";
+                case "england": return "gb-eng";
+                case "northern ireland": case "ni": return "gb-nir";
+                default: return "gb";
+            }
+        }
+        return country.ToLower();
+    }
 
     private TableClient GetRallyStagesClient() => new(
         new Uri(Environment.GetEnvironmentVariable("azureStorageUri")!),
@@ -85,6 +150,45 @@ public class LeaderboardController : ControllerBase
         foreach (var l in sorted)
         {
             entries.TryGetValue(l.RowKey, out var entry);
+
+            // Get driver nationality from tblPeople
+            var driverCountry = string.Empty;
+            var driverRegion = string.Empty;
+            if (!string.IsNullOrEmpty(entry?.DriverPersonRowKey))
+            {
+                (driverCountry, driverRegion) = await GetPersonNationality(entry.DriverPersonRowKey);
+            }
+            else if (!string.IsNullOrEmpty(entry?.DriverName))
+            {
+                var parts = entry.DriverName.Split(' ', 2);
+                var first = parts.Length > 0 ? parts[0] : string.Empty;
+                var last = parts.Length > 1 ? parts[1] : string.Empty;
+                (driverCountry, driverRegion) = await GetPersonNationalityByName(first, last);
+            }
+            else if (!string.IsNullOrEmpty(entry?.DriverNat))
+            {
+                driverCountry = entry.DriverNat;
+            }
+
+            // Get co-driver nationality from tblPeople
+            var coDriverCountry = string.Empty;
+            var coDriverRegion = string.Empty;
+            if (!string.IsNullOrEmpty(entry?.CoDriverPersonRowKey))
+            {
+                (coDriverCountry, coDriverRegion) = await GetPersonNationality(entry.CoDriverPersonRowKey);
+            }
+            else if (!string.IsNullOrEmpty(entry?.CoDriverName))
+            {
+                var parts = entry.CoDriverName.Split(' ', 2);
+                var first = parts.Length > 0 ? parts[0] : string.Empty;
+                var last = parts.Length > 1 ? parts[1] : string.Empty;
+                (coDriverCountry, coDriverRegion) = await GetPersonNationalityByName(first, last);
+            }
+            else if (!string.IsNullOrEmpty(entry?.CoDriverNat))
+            {
+                coDriverCountry = entry.CoDriverNat;
+            }
+
             items.Add(new
             {
                 overallPosition = l.OverallPosition,
@@ -92,6 +196,8 @@ public class LeaderboardController : ControllerBase
                 entrantId = l.RowKey,
                 driverName = entry?.DriverName ?? string.Empty,
                 coDriverName = entry?.CoDriverName ?? string.Empty,
+                driverNat = driverCountry,
+                coDriverNat = coDriverCountry,
                 raceNumber = entry?.RaceNumber ?? string.Empty,
                 raceClass = entry?.RaceClass ?? string.Empty,
                 carMake = entry?.CarMake ?? string.Empty,
@@ -138,23 +244,29 @@ public class LeaderboardController : ControllerBase
         {
             var seq = entity.GetInt32("StageNumber") ?? 0;
             var name = entity.GetString("StageName") ?? string.Empty;
-            var type = entity.GetString("StageType") ?? string.Empty;
-            // App-Admin stores BogeyTime/MaxTime as TimeSpan
+            var surface = entity.GetString("Surface") ?? string.Empty;
+            // App-Admin stores BogeyTime/MaxTime as TimeSpan (stored as ISO 8601 duration string in Table Storage)
             TimeSpan? bogeyTime = null;
             TimeSpan? maxTime = null;
             if (entity.TryGetValue("BogeyTime", out var bogeyObj))
             {
                 if (bogeyObj is TimeSpan ts) bogeyTime = ts;
-                else if (bogeyObj is string s && TimeSpan.TryParse(s, out var parsed)) bogeyTime = parsed;
+                else if (bogeyObj is string s)
+                {
+                    try { bogeyTime = XmlConvert.ToTimeSpan(s); } catch { }
+                }
             }
             if (entity.TryGetValue("MaxTime", out var maxObj))
             {
                 if (maxObj is TimeSpan ts) maxTime = ts;
-                else if (maxObj is string s && TimeSpan.TryParse(s, out var parsed)) maxTime = parsed;
+                else if (maxObj is string s)
+                {
+                    try { maxTime = XmlConvert.ToTimeSpan(s); } catch { }
+                }
             }
             var bogey = bogeyTime.HasValue ? bogeyTime.Value.TotalSeconds : (double?)null;
             var max = maxTime.HasValue ? maxTime.Value.TotalSeconds : (double?)null;
-            stagesDict[seq] = (name, type, bogey, max);
+            stagesDict[seq] = (name, surface, bogey, max);
         }
 
         // Get leaderboard summary for this entrant

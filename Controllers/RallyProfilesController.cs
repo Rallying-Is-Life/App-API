@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Azure.Data.Tables;
 using Azure.Identity;
 using System.Linq;
+using System.Xml;
 
 namespace App_API.Controllers;
 
@@ -107,26 +108,32 @@ public class RallyProfilesController : ControllerBase
                     stageDate = parsed;
             }
             var leg = entity.GetString("Leg") ?? string.Empty;
-            var stageType = entity.GetString("StageType") ?? string.Empty;
-            // App-Admin stores BogeyTime/MaxTime as TimeSpan
+            var surface = entity.GetString("Surface") ?? string.Empty;
+            // App-Admin stores BogeyTime/MaxTime as TimeSpan (stored as ISO 8601 duration string in Table Storage)
             TimeSpan? bogeyTime = null;
             TimeSpan? maxTime = null;
             if (entity.TryGetValue("BogeyTime", out var bogeyObj))
             {
                 if (bogeyObj is TimeSpan ts) bogeyTime = ts;
-                else if (bogeyObj is string s && TimeSpan.TryParse(s, out var parsed)) bogeyTime = parsed;
+                else if (bogeyObj is string s)
+                {
+                    try { bogeyTime = XmlConvert.ToTimeSpan(s); } catch { }
+                }
             }
             if (entity.TryGetValue("MaxTime", out var maxObj))
             {
                 if (maxObj is TimeSpan ts) maxTime = ts;
-                else if (maxObj is string s && TimeSpan.TryParse(s, out var parsed)) maxTime = parsed;
+                else if (maxObj is string s)
+                {
+                    try { maxTime = XmlConvert.ToTimeSpan(s); } catch { }
+                }
             }
             stages.Add(new StageInfo
             {
                 StageNumber = stageNum,
                 StageName = entity.GetString("StageName") ?? entity.RowKey ?? "",
                 StageLength = stageLengthDisplay,
-                StageType = stageType,
+                StageType = surface,
                 FlagUrl = flagUrl,
                 StageDate = stageDate,
                 Leg = leg,

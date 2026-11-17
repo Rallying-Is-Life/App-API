@@ -130,8 +130,8 @@ public class RallyProfilesController : ControllerBase
                 FlagUrl = flagUrl,
                 StageDate = stageDate,
                 Leg = leg,
-                BogeyTimeSeconds = bogeyTime.HasValue ? (int)bogeyTime.Value.TotalSeconds : null,
-                MaxTimeSeconds = maxTime.HasValue ? (int)maxTime.Value.TotalSeconds : null
+                BogeyTimeSeconds = bogeyTime.HasValue ? bogeyTime.Value.TotalSeconds : null,
+                MaxTimeSeconds = maxTime.HasValue ? maxTime.Value.TotalSeconds : null
             });
         }
 

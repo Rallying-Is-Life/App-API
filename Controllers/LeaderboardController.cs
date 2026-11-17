@@ -133,7 +133,7 @@ public class LeaderboardController : ControllerBase
         stageResults = stageResults.OrderBy(s => s.StageSequenceInt).ToList();
 
         // Get rally stages for stage names
-        var stagesDict = new Dictionary<int, (string StageName, string StageType, int? BogeyTimeSeconds, int? MaxTimeSeconds)>();
+        var stagesDict = new Dictionary<int, (string StageName, string StageType, double? BogeyTimeSeconds, double? MaxTimeSeconds)>();
         await foreach (var entity in rsClient.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}'", maxPerPage: 200))
         {
             var seq = entity.GetInt32("StageNumber") ?? 0;
@@ -152,8 +152,8 @@ public class LeaderboardController : ControllerBase
                 if (maxObj is TimeSpan ts) maxTime = ts;
                 else if (maxObj is string s && TimeSpan.TryParse(s, out var parsed)) maxTime = parsed;
             }
-            var bogey = bogeyTime.HasValue ? (int?)bogeyTime.Value.TotalSeconds : null;
-            var max = maxTime.HasValue ? (int?)maxTime.Value.TotalSeconds : null;
+            var bogey = bogeyTime.HasValue ? bogeyTime.Value.TotalSeconds : (double?)null;
+            var max = maxTime.HasValue ? maxTime.Value.TotalSeconds : (double?)null;
             stagesDict[seq] = (name, type, bogey, max);
         }
 

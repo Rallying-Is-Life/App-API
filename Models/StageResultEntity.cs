@@ -13,7 +13,7 @@ public class StageResultEntity : TableEntityBase
     public int StageSequenceInt => int.TryParse(StageSequence, out var seq) ? seq : 0;
     
     public string StageType { get; set; } = string.Empty;
-    public int? TimeSeconds { get; set; }
+    public double? TimeSeconds { get; set; }
     public int StagePenaltySeconds { get; set; }
     public int RoadPenaltySeconds { get; set; }
     public int ServicePenaltySeconds { get; set; }

@@ -41,7 +41,7 @@ public class LeaderboardController : ControllerBase
             {
                 if (string.IsNullOrEmpty(personRowKey))
                     return (string.Empty, string.Empty);
-            
+           
                 try
                 {
                     var resp = await GetPeopleClient().GetEntityIfExistsAsync<TableEntity>("tblPeople", personRowKey);
@@ -60,7 +60,7 @@ public class LeaderboardController : ControllerBase
             {
                 if (string.IsNullOrEmpty(firstName) || string.IsNullOrEmpty(surname))
                     return (string.Empty, string.Empty);
-            
+           
                 try
                 {
                     var filter = $"FirstName eq '{firstName}' and Surname eq '{surname}'";
@@ -239,7 +239,7 @@ public class LeaderboardController : ControllerBase
         stageResults = stageResults.OrderBy(s => s.StageSequenceInt).ToList();
 
         // Get rally stages for stage names
-        var stagesDict = new Dictionary<int, (string StageName, string StageType, int? BogeyTimeSeconds, int? MaxTimeSeconds)>();
+        var stagesDict = new Dictionary<int, (string StageName, string StageType, double? BogeyTimeSeconds, double? MaxTimeSeconds)>();
         await foreach (var entity in rsClient.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{id}'", maxPerPage: 200))
         {
             var seq = entity.GetInt32("StageNumber") ?? 0;
@@ -264,8 +264,8 @@ public class LeaderboardController : ControllerBase
                     try { maxTime = XmlConvert.ToTimeSpan(s); } catch { }
                 }
             }
-            var bogey = bogeyTime.HasValue ? (int?)bogeyTime.Value.TotalSeconds : null;
-            var max = maxTime.HasValue ? (int?)maxTime.Value.TotalSeconds : null;
+            var bogey = bogeyTime.HasValue ? bogeyTime.Value.TotalSeconds : (double?)null;
+            var max = maxTime.HasValue ? maxTime.Value.TotalSeconds : (double?)null;
             stagesDict[seq] = (name, surface, bogey, max);
         }
 

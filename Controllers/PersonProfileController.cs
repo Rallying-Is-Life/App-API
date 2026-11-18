@@ -81,7 +81,22 @@ namespace App_API.Controllers
                     rallyRowKey = entry.PartitionKey ?? "";
                     carMake = entry.GetString("CarMake") ?? "";
                     carModel = entry.GetString("CarModel") ?? "";
-                    carVrm = entry.GetString("Registration") ?? "";
+                    carVrm = entry.GetString("VRM") ?? "";
+
+                    // Fallback: if entry VRM is empty, get from tblCars via CarRowKey
+                    if (string.IsNullOrEmpty(carVrm))
+                    {
+                        var carRowKey = entry.GetString("CarRowKey") ?? "";
+                        if (!string.IsNullOrEmpty(carRowKey))
+                        {
+                            var carClient = new TableServiceClient(new Uri(uri), cred).GetTableClient(TableNames.tblCars);
+                            await foreach (var car in carClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{carRowKey}'", maxPerPage: 1))
+                            {
+                                carVrm = car.GetString("VRM") ?? "";
+                                break;
+                            }
+                        }
+                    }
 
                     // Get leaderboard data for this entrant
                     string status = "";

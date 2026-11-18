@@ -83,6 +83,23 @@ namespace App_API.Controllers
                     carModel = entry.GetString("CarModel") ?? "";
                     carVrm = entry.GetString("Registration") ?? "";
 
+                    // Get leaderboard data for this entrant
+                    string status = "";
+                    int? overallPosition = null;
+                    int? classPosition = null;
+
+                    if (!string.IsNullOrEmpty(rallyRowKey))
+                    {
+                        var leaderboardClient = new TableServiceClient(new Uri(uri), cred).GetTableClient(TableNames.tblRallyLeaderboard);
+                        await foreach (var lb in leaderboardClient.QueryAsync<TableEntity>(filter: $"PartitionKey eq '{rallyRowKey}' and RowKey eq '{eventRowKey}'", maxPerPage: 1))
+                        {
+                            status = lb.GetString("Status") ?? "";
+                            overallPosition = lb.GetInt32("OverallPosition");
+                            classPosition = lb.GetInt32("ClassPosition");
+                            break;
+                        }
+                    }
+
                     if (role.Equals("Driver", StringComparison.OrdinalIgnoreCase))
                     {
                         var coDriverRowKey = entry.GetString("CoDriverPersonRowKey") ?? "";
@@ -117,20 +134,24 @@ namespace App_API.Controllers
                             }
                         }
                     }
+
+                    events.Add(new
+                    {
+                        year = eventYear,
+                        rallyName = eventName,
+                        rallyRowKey = rallyRowKey,
+                        role = role,
+                        partnerName = partnerName,
+                        carMake = carMake,
+                        carModel = carModel,
+                        carVrm = carVrm,
+                        status = status,
+                        overallPosition = overallPosition,
+                        classPosition = classPosition
+                    });
+
                     break; // Only one entry per eventRowKey
                 }
-
-                events.Add(new
-                {
-                    year = eventYear,
-                    rallyName = eventName,
-                    rallyRowKey = rallyRowKey,
-                    role = role,
-                    partnerName = partnerName,
-                    carMake = carMake,
-                    carModel = carModel,
-                    carVrm = carVrm
-                });
             }
 
             // Sort events by year descending, then rally name

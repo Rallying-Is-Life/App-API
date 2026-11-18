@@ -42,14 +42,19 @@ namespace App_API.Controllers
             // Get person details
             var peopleClient = new TableServiceClient(new Uri(uri), cred).GetTableClient(TableNames.tblPeople);
             string firstName = "", surname = "", country = "", region = "";
-            var personEntity = await peopleClient.GetEntityIfExistsAsync<TableEntity>("person", id);
-            if (!personEntity.HasValue)
+            TableEntity personEntity = null;
+            await foreach (var p in peopleClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{id}'", maxPerPage: 1))
+            {
+                personEntity = p;
+                break;
+            }
+            if (personEntity == null)
                 return NotFound();
 
-            firstName = personEntity.Value.GetString("FirstName") ?? "";
-            surname = personEntity.Value.GetString("Surname") ?? "";
-            country = personEntity.Value.GetString("Country") ?? "";
-            region = personEntity.Value.GetString("Region") ?? "";
+            firstName = personEntity.GetString("FirstName") ?? "";
+            surname = personEntity.GetString("Surname") ?? "";
+            country = personEntity.GetString("Country") ?? "";
+            region = personEntity.GetString("Region") ?? "";
 
             var displayNat = !string.IsNullOrEmpty(region) ? region : country;
             var flagCode = ParseFlagCode(country, region);
@@ -83,10 +88,15 @@ namespace App_API.Controllers
                         var coDriverRowKey = entry.GetString("CoDriverPersonRowKey") ?? "";
                         if (!string.IsNullOrEmpty(coDriverRowKey))
                         {
-                            var coDriverEntity = await peopleClient.GetEntityIfExistsAsync<TableEntity>("person", coDriverRowKey);
-                            if (coDriverEntity.HasValue)
+                            TableEntity coDriverEntity = null;
+                            await foreach (var p in peopleClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{coDriverRowKey}'", maxPerPage: 1))
                             {
-                                partnerName = $"{coDriverEntity.Value.GetString("FirstName") ?? ""} {coDriverEntity.Value.GetString("Surname") ?? ""}".Trim();
+                                coDriverEntity = p;
+                                break;
+                            }
+                            if (coDriverEntity != null)
+                            {
+                                partnerName = $"{coDriverEntity.GetString("FirstName") ?? ""} {coDriverEntity.GetString("Surname") ?? ""}".Trim();
                             }
                         }
                     }
@@ -95,10 +105,15 @@ namespace App_API.Controllers
                         var driverRowKey = entry.GetString("DriverPersonRowKey") ?? "";
                         if (!string.IsNullOrEmpty(driverRowKey))
                         {
-                            var driverEntity = await peopleClient.GetEntityIfExistsAsync<TableEntity>("person", driverRowKey);
-                            if (driverEntity.HasValue)
+                            TableEntity driverEntity = null;
+                            await foreach (var p in peopleClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{driverRowKey}'", maxPerPage: 1))
                             {
-                                partnerName = $"{driverEntity.Value.GetString("FirstName") ?? ""} {driverEntity.Value.GetString("Surname") ?? ""}".Trim();
+                                driverEntity = p;
+                                break;
+                            }
+                            if (driverEntity != null)
+                            {
+                                partnerName = $"{driverEntity.GetString("FirstName") ?? ""} {driverEntity.GetString("Surname") ?? ""}".Trim();
                             }
                         }
                     }

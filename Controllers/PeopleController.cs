@@ -35,19 +35,32 @@ namespace App_API.Controllers
             var u = Environment.GetEnvironmentVariable("azureStorageUri")!;
             var cred = new DefaultAzureCredential();
             var idx = new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblPersonEventIndex);
-            var people = new List<object>();
-            await foreach(var e in idx.QueryAsync<TableEntity>(filter: $"Role eq '{filterRole}'"))
+
+            // Group by personRowKey (PartitionKey) and count events
+            var personEventCounts = new Dictionary<string, int>();
+            await foreach (var e in idx.QueryAsync<TableEntity>(filter: $"Role eq '{filterRole}'"))
             {
                 var personRowKey = e.PartitionKey;
-                var peopleClient = new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblPeople);
+                if (personEventCounts.ContainsKey(personRowKey))
+                    personEventCounts[personRowKey]++;
+                else
+                    personEventCounts[personRowKey] = 1;
+            }
+
+            var people = new List<object>();
+            var peopleClient = new TableServiceClient(new Uri(u), cred).GetTableClient(TableNames.tblPeople);
+            foreach (var kvp in personEventCounts)
+            {
+                var personRowKey = kvp.Key;
+                var eventCount = kvp.Value;
                 string first = "", surname = "", country = "", region = "";
-                await foreach(var p in peopleClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{personRowKey}'"))
+                await foreach (var p in peopleClient.QueryAsync<TableEntity>(filter: $"RowKey eq '{personRowKey}'"))
                 { first = p["FirstName"]?.ToString() ?? ""; surname = p["Surname"]?.ToString() ?? ""; country = p["Country"]?.ToString() ?? ""; region = p["Region"]?.ToString() ?? ""; }
-                string displayNat = !string.IsNullOrEmpty(region) ? region : country;
                 string flagCode = ParseFlagCode(country, region);
                 string flag = string.IsNullOrEmpty(flagCode) ? "" : $"/images/flags/4x3/{flagCode}.svg";
-                people.Add(new { personRowKey, firstName = first, surname, country = country, region = region, role = e["Role"]?.ToString(), eventYear = e["EventYear"]?.ToString(), eventName = e["EventName"]?.ToString(), flag = flag });
+                people.Add(new { personRowKey, firstName = first, surname, country = country, region = region, role = filterRole, eventCount = eventCount, flag = flag });
             }
+
             return Ok(new { query = type ?? role, filterRole, count = people.Count, items = people });
         }
     }

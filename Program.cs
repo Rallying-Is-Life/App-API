@@ -12,23 +12,39 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["AzureAd:ClientSecret"] = (Environment.GetEnvironmentVariable("ClientSecret") ?? Environment.GetEnvironmentVariable("Auth__ClientSecret") ?? "")
 });
 
+// CIAM (Entra External ID) support
+// If CiamTenantName is set, use CIAM authority/issuer; else use regular Entra ID
+var tenantId = Environment.GetEnvironmentVariable("Auth__TenantId") ?? Environment.GetEnvironmentVariable("TenantID") ?? "";
+var ciamTenantName = Environment.GetEnvironmentVariable("CiamTenantName") ?? "";
+var apiAudience = Environment.GetEnvironmentVariable("Auth__Audience") ?? Environment.GetEnvironmentVariable("Auth__ClientId") ?? "";
+
+// Build authority and issuer for CIAM vs regular Entra ID
+// For CIAM: Authority = Issuer = https://{tenant-name}.ciamlogin.com/{tenant-id}/v2.0
+// For regular Entra ID: Authority = Issuer = https://login.microsoftonline.com/{tenant-id}/v2.0
+var authority = string.IsNullOrEmpty(ciamTenantName)
+    ? $"https://login.microsoftonline.com/{tenantId}/v2.0"
+    : $"https://{ciamTenantName}.ciamlogin.com/{tenantId}/v2.0";
+
+var validIssuer = authority;
+
 builder.Services.AddControllers();
 // Auth middleware (selective — controllers use [Authorize] / [AllowAnonymous])
-var tenantId = Environment.GetEnvironmentVariable("Auth__TenantId") ?? "";
-var apiAudience = Environment.GetEnvironmentVariable("Auth__Audience") ?? Environment.GetEnvironmentVariable("Auth__ClientId") ?? "";
 builder.Services.AddAuthentication("Bearer")
-    .AddJwtBearer("Bearer", o => {
-        o.Authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+    .AddJwtBearer("Bearer", o =>
+    {
+        o.Authority = authority;
         o.Audience = apiAudience;
-        o.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters {
+        o.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
             ValidateAudience = true,
             ValidAudience = apiAudience,
             ValidateIssuer = true,
-            ValidIssuer = $"https://login.microsoftonline.com/{tenantId}/v2.0",
+            ValidIssuer = validIssuer,
             NameClaimType = "name",
         };
     });
-builder.Services.AddAuthorization(options => {
+builder.Services.AddAuthorization(options =>
+{
     options.AddPolicy("Read", policy => policy.AddRequirements(new App_API.Authorization.ScopePolicy("Api.Read")));
     options.AddPolicy("Write", policy => policy.AddRequirements(new App_API.Authorization.ScopePolicy("Api.Write")));
     options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()

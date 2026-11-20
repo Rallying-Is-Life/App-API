@@ -226,6 +226,7 @@ public class LeaderboardController : ControllerBase
         var srClient = GetStageResultsClient();
         var rsClient = GetRallyStagesClient();
         var lbClient = GetLeaderboardClient();
+        var eeClient = GetEventEntriesClient();
 
         // Get stage results for this entrant (RowKey = {entrantId}_{stageSequence:D3}_{type})
         var filter = $"PartitionKey eq '{id}' and RowKey ge '{entrantId}_' and RowKey lt '{entrantId}~'";
@@ -273,10 +274,127 @@ public class LeaderboardController : ControllerBase
         var lbResp = await lbClient.GetEntityIfExistsAsync<RallyLeaderboardEntity>(id, entrantId);
         var leaderboard = lbResp.HasValue ? lbResp.Value : null;
 
+        // Pre-compute stage positions for all stages this entrant participated in (SpecialStage only)
+        var entrantStageSeqs = stageResults
+            .Where(s => string.Equals(s.StageType?.Trim(), "SpecialStage", StringComparison.OrdinalIgnoreCase))
+            .Select(s => s.StageSequenceInt)
+            .Distinct()
+            .ToList();
+
+        var stagePositions = new Dictionary<int, (int OverallPosition, int ClassPosition)>();
+
+        foreach (var stageSeq in entrantStageSeqs)
+        {
+            // Get all stage results for this stage (SpecialStage)
+            var stageFilter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}' and StageType eq 'SpecialStage'";
+            var allStageResults = new List<StageResultEntity>();
+            await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: stageFilter, maxPerPage: 200))
+            {
+                allStageResults.Add(entity);
+            }
+
+            // Get entries for driver/co-driver/car info
+            var allEntrantIds = allStageResults.Select(s => s.RowKey.Split('_')[0]).Distinct().ToList();
+            var entries = new Dictionary<string, EventEntryTableEntity>();
+            foreach (var eid in allEntrantIds)
+            {
+                try
+                {
+                    var resp = await eeClient.GetEntityIfExistsAsync<EventEntryTableEntity>(id, eid);
+                    if (resp.HasValue)
+                        entries[eid] = resp.Value;
+                }
+                catch { }
+            }
+
+            // Sort by TimeSeconds asc (null last)
+            var sorted = allStageResults
+                .Where(s => entries.ContainsKey(s.RowKey.Split('_')[0]))
+                .OrderBy(s => s.TimeSeconds ?? int.MaxValue)
+                .ToList();
+
+            // Compute overall positions using dense ranking
+            int position = 0;
+            double? previousTime = null;
+
+            // Pre-compute class position lookup
+            var classPositions = new Dictionary<string, int>();
+            var classGroups = sorted
+                .GroupBy(s => entries.TryGetValue(s.RowKey.Split('_')[0], out var e) ? e.Class : "")
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var classGroup in classGroups)
+            {
+                int classPos = 0;
+                double? classPrevTime = null;
+                foreach (var sr in classGroup.Value)
+                {
+                    var eid = sr.RowKey.Split('_')[0];
+                    if (sr.TimeSeconds.HasValue)
+                    {
+                        if (classPrevTime.HasValue && sr.TimeSeconds.Value == classPrevTime.Value)
+                        {
+                            // Tied - same position
+                        }
+                        else
+                        {
+                            classPos = classGroup.Value.IndexOf(sr) + 1;
+                            // Adjust for ties
+                            for (int i = 0; i < classGroup.Value.IndexOf(sr); i++)
+                            {
+                                if (classGroup.Value[i].TimeSeconds.HasValue && sr.TimeSeconds.HasValue &&
+                                    classGroup.Value[i].TimeSeconds.Value == sr.TimeSeconds.Value)
+                                {
+                                    classPos = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        classPos = classGroup.Value.IndexOf(sr) + 1;
+                    }
+                    classPositions[sr.RowKey] = classPos;
+                    classPrevTime = sr.TimeSeconds;
+                }
+            }
+
+            foreach (var sr in sorted)
+            {
+                var eid = sr.RowKey.Split('_')[0];
+                if (eid == entrantId)
+                {
+                    // Overall position with dense ranking
+                    if (sr.TimeSeconds.HasValue)
+                    {
+                        if (previousTime.HasValue && sr.TimeSeconds.Value == previousTime.Value)
+                        {
+                            // Tied - same position as previous
+                        }
+                        else
+                        {
+                            position = sorted.TakeWhile(s => s.TimeSeconds.HasValue && s.TimeSeconds.Value < sr.TimeSeconds.Value).Count() + 1;
+                        }
+                    }
+                    else
+                    {
+                        position = sorted.Count(s => s.TimeSeconds.HasValue) + sorted.TakeWhile(s => !s.TimeSeconds.HasValue).TakeWhile(s => s.RowKey.Split('_')[0] != eid).Count() + 1;
+                    }
+                    previousTime = sr.TimeSeconds;
+
+                    classPositions.TryGetValue(sr.RowKey, out var classPos);
+                    stagePositions[stageSeq] = (position, classPos);
+                    break;
+                }
+            }
+        }
+
         var stages = new List<object>();
         foreach (var sr in stageResults)
         {
             stagesDict.TryGetValue(sr.StageSequenceInt, out var stageInfo);
+            stagePositions.TryGetValue(sr.StageSequenceInt, out var pos);
             stages.Add(new
             {
                 stageSequence = sr.StageSequenceInt,
@@ -288,12 +406,13 @@ public class LeaderboardController : ControllerBase
                 bogeyTimeHit = sr.BogeyTimeHit,
                 maxTimeHit = sr.MaxTimeHit,
                 bogeyTimeSeconds = stageInfo.BogeyTimeSeconds,
-                maxTimeSeconds = stageInfo.MaxTimeSeconds
+                maxTimeSeconds = stageInfo.MaxTimeSeconds,
+                overallPosition = pos.OverallPosition > 0 ? pos.OverallPosition : (int?)null,
+                classPosition = pos.ClassPosition > 0 ? pos.ClassPosition : (int?)null
             });
         }
 
         // Get event entry for this entrant to resolve nationality
-        var eeClient = GetEventEntriesClient();
         var entryResp = await eeClient.GetEntityIfExistsAsync<EventEntryTableEntity>(id, entrantId);
         var entry = entryResp.HasValue ? entryResp.Value : null;
 
@@ -396,18 +515,87 @@ public class LeaderboardController : ControllerBase
             .OrderBy(s => s.TimeSeconds ?? int.MaxValue)
             .ToList();
 
+        // Compute overall positions using dense ranking
         var items = new List<object>();
         int position = 0;
+        double? previousTime = null;
+
+        // Pre-compute class position lookup
+        var classPositions = new Dictionary<string, int>();
+        var classGroups = sorted
+            .GroupBy(s => entries.TryGetValue(s.RowKey.Split('_')[0], out var e) ? e.Class : "")
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var classGroup in classGroups)
+        {
+            int classPos = 0;
+            double? classPrevTime = null;
+            foreach (var sr in classGroup.Value)
+            {
+                var eid = sr.RowKey.Split('_')[0];
+                if (sr.TimeSeconds.HasValue)
+                {
+                    if (classPrevTime.HasValue && sr.TimeSeconds.Value == classPrevTime.Value)
+                    {
+                        // Tied - same position
+                    }
+                    else
+                    {
+                        classPos = classPositions.Count(c => c.Value == classPos) + 1;
+                        // Actually, simpler: position in this class group
+                        classPos = classGroup.Value.IndexOf(sr) + 1;
+                        // Adjust for ties
+                        for (int i = 0; i < classGroup.Value.IndexOf(sr); i++)
+                        {
+                            if (classGroup.Value[i].TimeSeconds.HasValue && sr.TimeSeconds.HasValue &&
+                                classGroup.Value[i].TimeSeconds.Value == sr.TimeSeconds.Value)
+                            {
+                                classPos = i + 1;
+                                break;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    classPos = classGroup.Value.IndexOf(sr) + 1;
+                }
+                classPositions[sr.RowKey] = classPos;
+                classPrevTime = sr.TimeSeconds;
+            }
+        }
+
         foreach (var sr in sorted)
         {
             var eid = sr.RowKey.Split('_')[0];
             entries.TryGetValue(eid, out var entry);
             if (entry == null) continue;
 
-            position++;
+            // Overall position with dense ranking
+            if (sr.TimeSeconds.HasValue)
+            {
+                if (previousTime.HasValue && sr.TimeSeconds.Value == previousTime.Value)
+                {
+                    // Tied - same position as previous
+                }
+                else
+                {
+                    position = items.Count + 1;
+                }
+            }
+            else
+            {
+                // No time (DNS/DNF) - position after all timed entries
+                position = items.Count + 1;
+            }
+            previousTime = sr.TimeSeconds;
+
+            classPositions.TryGetValue(sr.RowKey, out var classPos);
+
             items.Add(new
             {
-                position,
+                overallPosition = position,
+                classPosition = classPos,
                 entrantId = eid,
                 driverName = entry.DriverName,
                 coDriverName = entry.CoDriverName,

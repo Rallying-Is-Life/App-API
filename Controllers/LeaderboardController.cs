@@ -322,7 +322,8 @@ public class LeaderboardController : ControllerBase
             // Pre-compute class position lookup
             var classPositions = new Dictionary<string, int>();
             var classGroups = sorted
-                .GroupBy(s => entries.TryGetValue(s.RowKey.Split('_')[0], out var e) ? e.Class : "")
+                .Where(s => entries.TryGetValue(s.RowKey.Split('_')[0], out var e) && !string.IsNullOrEmpty(e.Class))
+                .GroupBy(s => entries[s.RowKey.Split('_')[0]].Class)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
             foreach (var classGroup in classGroups)
@@ -527,7 +528,8 @@ public class LeaderboardController : ControllerBase
         // Pre-compute class position lookup
         var classPositions = new Dictionary<string, int>();
         var classGroups = sorted
-            .GroupBy(s => entries.TryGetValue(s.RowKey.Split('_')[0], out var e) ? e.Class : "")
+            .Where(s => entries.TryGetValue(s.RowKey.Split('_')[0], out var e) && !string.IsNullOrEmpty(e.Class))
+            .GroupBy(s => entries[s.RowKey.Split('_')[0]].Class)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         foreach (var classGroup in classGroups)
@@ -545,8 +547,6 @@ public class LeaderboardController : ControllerBase
                     }
                     else
                     {
-                        classPos = classPositions.Count(c => c.Value == classPos) + 1;
-                        // Actually, simpler: position in this class group
                         classPos = classGroup.Value.IndexOf(sr) + 1;
                         // Adjust for ties
                         for (int i = 0; i < classGroup.Value.IndexOf(sr); i++)

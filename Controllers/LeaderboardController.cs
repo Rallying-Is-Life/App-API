@@ -628,7 +628,7 @@ public class LeaderboardController : ControllerBase
                 if (resp.HasValue)
                 {
                     var entry = resp.Value;
-                    if (string.IsNullOrEmpty(classId) || entry.Class == classId)
+                    var entryClass = (entry.Class ?? entry.RaceClass)?.Trim() ?? ""; var filterClass = classId?.Trim() ?? ""; if (string.IsNullOrEmpty(filterClass) || string.Equals(entryClass, filterClass, StringComparison.OrdinalIgnoreCase))
                         entries[eid] = entry;
                 }
             }

@@ -289,8 +289,8 @@ public class RallyProfilesController : ControllerBase
             TableNames.tblEventEntries,
             new DefaultAzureCredential());
 
-        // Get stage results for SpecialStage type only
-        var filter = $"PartitionKey eq '{rallyId}' and StageSequence eq '{stageSeq:D3}' and StageType eq 'SpecialStage'";
+        // Get stage results for competitive stages
+        var filter = $"PartitionKey eq '{rallyId}' and StageSequence eq '{stageSeq:D3}'";
         var stageResults = new List<StageResultEntity>();
         await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: filter, maxPerPage: 200))
         {

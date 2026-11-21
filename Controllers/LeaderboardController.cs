@@ -226,6 +226,7 @@ public class LeaderboardController : ControllerBase
         var srClient = GetStageResultsClient();
         var rsClient = GetRallyStagesClient();
         var lbClient = GetLeaderboardClient();
+        var eeClient = GetEventEntriesClient();
 
         // Get stage results for this entrant (RowKey = {entrantId}_{stageSequence:D3}_{type})
         var filter = $"PartitionKey eq '{id}' and RowKey ge '{entrantId}_' and RowKey lt '{entrantId}~'";
@@ -273,10 +274,116 @@ public class LeaderboardController : ControllerBase
         var lbResp = await lbClient.GetEntityIfExistsAsync<RallyLeaderboardEntity>(id, entrantId);
         var leaderboard = lbResp.HasValue ? lbResp.Value : null;
 
+        // Pre-compute stage positions for all stages this entrant participated in
+        var entrantStageSeqs = stageResults
+            .Select(s => s.StageSequenceInt)
+            .Distinct()
+            .ToList();
+
+        var stagePositions = new Dictionary<int, (int OverallPosition, int ClassPosition)>();
+
+        foreach (var stageSeq in entrantStageSeqs)
+        {
+            // Get all stage results for this stage - query all and filter by StageSequenceInt in memory
+            // (StageSequence in table may not be zero-padded, so D3 format may not match)
+            var stageFilter = $"PartitionKey eq '{id}'";
+            var allStageResults = new List<StageResultEntity>();
+            await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: stageFilter, maxPerPage: 200))
+            {
+                if (entity.StageSequenceInt == stageSeq)
+                    allStageResults.Add(entity);
+            }
+
+            // Get entries for driver/co-driver/car info
+            var allEntrantIds = allStageResults.Select(s => s.RowKey.Split('_')[0]).Distinct().ToList();
+            var entries = new Dictionary<string, EventEntryTableEntity>();
+            foreach (var eid in allEntrantIds)
+            {
+                try
+                {
+                    var resp = await eeClient.GetEntityIfExistsAsync<EventEntryTableEntity>(id, eid);
+                    if (resp.HasValue)
+                        entries[eid] = resp.Value;
+                }
+                catch { }
+            }
+
+            // Sort by TimeSeconds asc (null last)
+            var sorted = allStageResults
+                .Where(s => entries.ContainsKey(s.RowKey.Split('_')[0]))
+                .OrderBy(s => s.TimeSeconds ?? int.MaxValue)
+                .ToList();
+
+            // Compute overall positions using dense ranking
+            int position = 0;
+            double? previousTime = null;
+
+            // Pre-compute class position lookup
+                        // Compute class positions within each class (dense ranking)
+            var classPositions = new Dictionary<string, int>();
+            foreach (var sr in sorted)
+            {
+                var eid = sr.RowKey.Split('_')[0];
+                if (!entries.TryGetValue(eid, out var entryObj) || string.IsNullOrEmpty(entryObj.Class ?? entryObj.RaceClass))
+                    continue;
+
+                var classKey = $"{(entryObj.Class ?? entryObj.RaceClass)}|{sr.RowKey}";
+                if (!classPositions.ContainsKey(classKey))
+                {
+                    int classPos = 1;
+                    foreach (var other in sorted)
+                    {
+                        var otherEid = other.RowKey.Split('_')[0];
+                        if (!entries.TryGetValue(otherEid, out var otherEntry) || (otherEntry.Class ?? otherEntry.RaceClass) != (entryObj.Class ?? entryObj.RaceClass))
+                            continue;
+                        if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value < sr.TimeSeconds.Value)
+                            classPos++;
+                        else if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value == sr.TimeSeconds.Value && other.RowKey.CompareTo(sr.RowKey) < 0)
+                            classPos++;
+                    }
+                    classPositions[classKey] = classPos;
+                }
+            }
+
+
+
+            foreach (var sr in sorted)
+            {
+                var eid = sr.RowKey.Split('_')[0];
+                if (eid == entrantId)
+                {
+                    // Overall position with dense ranking
+                    if (sr.TimeSeconds.HasValue)
+                    {
+                        if (previousTime.HasValue && sr.TimeSeconds.Value == previousTime.Value)
+                        {
+                            // Tied - same position as previous
+                        }
+                        else
+                        {
+                            position = sorted.TakeWhile(s => s.TimeSeconds.HasValue && s.TimeSeconds.Value < sr.TimeSeconds.Value).Count() + 1;
+                        }
+                    }
+                    else
+                    {
+                        position = sorted.Count(s => s.TimeSeconds.HasValue) + sorted.TakeWhile(s => !s.TimeSeconds.HasValue).TakeWhile(s => s.RowKey.Split('_')[0] != eid).Count() + 1;
+                    }
+                    previousTime = sr.TimeSeconds;
+
+                    entries.TryGetValue(eid, out var entryObj);
+                    var classKey = (entryObj?.Class ?? entryObj?.RaceClass) != null ? $"{(entryObj.Class ?? entryObj.RaceClass)}|{sr.RowKey}" : "";
+                    classPositions.TryGetValue(classKey, out var classPos);
+                    stagePositions[stageSeq] = (position, classPos);
+                    break;
+                }
+            }
+        }
+
         var stages = new List<object>();
         foreach (var sr in stageResults)
         {
             stagesDict.TryGetValue(sr.StageSequenceInt, out var stageInfo);
+            stagePositions.TryGetValue(sr.StageSequenceInt, out var pos);
             stages.Add(new
             {
                 stageSequence = sr.StageSequenceInt,
@@ -288,12 +395,13 @@ public class LeaderboardController : ControllerBase
                 bogeyTimeHit = sr.BogeyTimeHit,
                 maxTimeHit = sr.MaxTimeHit,
                 bogeyTimeSeconds = stageInfo.BogeyTimeSeconds,
-                maxTimeSeconds = stageInfo.MaxTimeSeconds
+                maxTimeSeconds = stageInfo.MaxTimeSeconds,
+                overallPosition = pos.OverallPosition > 0 ? pos.OverallPosition : (int?)null,
+                classPosition = pos.ClassPosition > 0 ? pos.ClassPosition : (int?)null
             });
         }
 
         // Get event entry for this entrant to resolve nationality
-        var eeClient = GetEventEntriesClient();
         var entryResp = await eeClient.GetEntityIfExistsAsync<EventEntryTableEntity>(id, entrantId);
         var entry = entryResp.HasValue ? entryResp.Value : null;
 
@@ -361,12 +469,14 @@ public class LeaderboardController : ControllerBase
             break;
         }
 
-        // Get stage results for SpecialStage type only
-        var filter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}' and StageType eq 'SpecialStage'";
+        // Get stage results for competitive stages - query all and filter by StageSequenceInt in memory
+        // (StageSequence in table may not be zero-padded, so D3 format may not match)
+        var filter = $"PartitionKey eq '{id}'";
         var stageResults = new List<StageResultEntity>();
         await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: filter, maxPerPage: 200))
         {
-            stageResults.Add(entity);
+            if (entity.StageSequenceInt == stageSeq)
+                stageResults.Add(entity);
         }
 
         if (stageResults.Count == 0)
@@ -383,7 +493,10 @@ public class LeaderboardController : ControllerBase
                 if (resp.HasValue)
                 {
                     var entry = resp.Value;
-                    if (string.IsNullOrEmpty(classId) || entry.Class == classId)
+                    // Normalize class for comparison (trim whitespace) - use RaceClass as fallback
+                    var entryClass = (entry.Class ?? entry.RaceClass)?.Trim() ?? "";
+                    var filterClass = classId?.Trim() ?? "";
+                    if (string.IsNullOrEmpty(filterClass) || string.Equals(entryClass, filterClass, StringComparison.OrdinalIgnoreCase))
                         entries[eid] = entry;
                 }
             }
@@ -391,34 +504,85 @@ public class LeaderboardController : ControllerBase
         }
 
         // Sort by TimeSeconds asc (null last)
-        var sorted = stageResults
-            .Where(s => entries.ContainsKey(s.RowKey.Split('_')[0]))
-            .OrderBy(s => s.TimeSeconds ?? int.MaxValue)
-            .ToList();
+                var sorted = stageResults
+                    .Where(s => entries.ContainsKey(s.RowKey.Split('_')[0]))
+                    .OrderBy(s => s.TimeSeconds ?? int.MaxValue)
+                    .ToList();
 
-        var items = new List<object>();
-        int position = 0;
-        foreach (var sr in sorted)
-        {
-            var eid = sr.RowKey.Split('_')[0];
-            entries.TryGetValue(eid, out var entry);
-            if (entry == null) continue;
+                // Compute overall positions using dense ranking
+                var items = new List<object>();
+                int position = 0;
+                double? previousTime = null;
 
-            position++;
-            items.Add(new
-            {
-                position,
-                entrantId = eid,
-                driverName = entry.DriverName,
-                coDriverName = entry.CoDriverName,
-                raceNumber = entry.RaceNumber,
-                raceClass = entry.RaceClass,
-                timeSeconds = sr.TimeSeconds,
-                status = sr.Status
-            });
-        }
+                // Compute class positions within each class (dense ranking)
+                var classPositions = new Dictionary<string, int>();
+                foreach (var sr in sorted)
+                {
+                    var eid = sr.RowKey.Split('_')[0];
+                    if (!entries.TryGetValue(eid, out var entry) || string.IsNullOrEmpty(entry.Class ?? entry.RaceClass))
+                        continue;
 
-        return Ok(new { stageSequence = stageSeq, stageName, items });
+                    var classKey = $"{(entry.Class ?? entry.RaceClass)}|{sr.RowKey}";
+                    if (!classPositions.ContainsKey(classKey))
+                    {
+                        int classPos = 1;
+                        foreach (var other in sorted)
+                        {
+                            var otherEid = other.RowKey.Split('_')[0];
+                            if (!entries.TryGetValue(otherEid, out var otherEntry) || (otherEntry.Class ?? otherEntry.RaceClass) != (entry.Class ?? entry.RaceClass))
+                                continue;
+                            if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value < sr.TimeSeconds.Value)
+                                classPos++;
+                            else if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value == sr.TimeSeconds.Value && other.RowKey.CompareTo(sr.RowKey) < 0)
+                                classPos++;
+                        }
+                        classPositions[classKey] = classPos;
+                    }
+                }
+
+                foreach (var sr in sorted)
+                {
+                    var eid = sr.RowKey.Split('_')[0];
+                    entries.TryGetValue(eid, out var entry);
+                    if (entry == null) continue;
+
+                    // Overall position with dense ranking
+                    if (sr.TimeSeconds.HasValue)
+                    {
+                        if (previousTime.HasValue && sr.TimeSeconds.Value == previousTime.Value)
+                        {
+                            // Tied - same position as previous
+                        }
+                        else
+                        {
+                            position = items.Count + 1;
+                        }
+                    }
+                    else
+                    {
+                        // No time (DNS/DNF) - position after all timed entries
+                        position = items.Count + 1;
+                    }
+                    previousTime = sr.TimeSeconds;
+
+                    var classKey = (entry.Class ?? entry.RaceClass) != null ? $"{(entry.Class ?? entry.RaceClass)}|{sr.RowKey}" : "";
+                    classPositions.TryGetValue(classKey, out var classPos);
+
+                    items.Add(new
+                    {
+                        overallPosition = position,
+                        classPosition = classPos > 0 ? classPos : (int?)null,
+                        entrantId = eid,
+                        driverName = entry.DriverName,
+                        coDriverName = entry.CoDriverName,
+                        raceNumber = entry.RaceNumber,
+                        raceClass = entry.Class ?? entry.RaceClass,
+                        timeSeconds = sr.TimeSeconds,
+                        status = sr.Status
+                    });
+                }
+
+                return Ok(new { stageSequence = stageSeq, stageName, items });
     }
 
     // GET /leaderboard/retirements?id=<rallyRowKey>[&classId=<classId>]
@@ -451,7 +615,7 @@ public class LeaderboardController : ControllerBase
                 if (resp.HasValue)
                 {
                     var entry = resp.Value;
-                    if (string.IsNullOrEmpty(classId) || entry.Class == classId)
+                    var entryClass = (entry.Class ?? entry.RaceClass)?.Trim() ?? ""; var filterClass = classId?.Trim() ?? ""; if (string.IsNullOrEmpty(filterClass) || string.Equals(entryClass, filterClass, StringComparison.OrdinalIgnoreCase))
                         entries[eid] = entry;
                 }
             }

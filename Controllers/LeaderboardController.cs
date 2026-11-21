@@ -285,12 +285,14 @@ public class LeaderboardController : ControllerBase
 
         foreach (var stageSeq in entrantStageSeqs)
         {
-            // Get all stage results for this stage (competitive stages)
-            var stageFilter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}'";
+            // Get all stage results for this stage - query all and filter by StageSequenceInt in memory
+            // (StageSequence in table may not be zero-padded, so D3 format may not match)
+            var stageFilter = $"PartitionKey eq '{id}'";
             var allStageResults = new List<StageResultEntity>();
             await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: stageFilter, maxPerPage: 200))
             {
-                allStageResults.Add(entity);
+                if (entity.StageSequenceInt == stageSeq)
+                    allStageResults.Add(entity);
             }
 
             // Get entries for driver/co-driver/car info
@@ -480,12 +482,14 @@ public class LeaderboardController : ControllerBase
             break;
         }
 
-        // Get stage results for competitive stages (exclude RoadSection, Service, etc.)
-        var filter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}'";
+        // Get stage results for competitive stages - query all and filter by StageSequenceInt in memory
+        // (StageSequence in table may not be zero-padded, so D3 format may not match)
+        var filter = $"PartitionKey eq '{id}'";
         var stageResults = new List<StageResultEntity>();
         await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: filter, maxPerPage: 200))
         {
-            stageResults.Add(entity);
+            if (entity.StageSequenceInt == stageSeq)
+                stageResults.Add(entity);
         }
 
         if (stageResults.Count == 0)

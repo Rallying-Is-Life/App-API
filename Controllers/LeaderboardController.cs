@@ -506,8 +506,8 @@ public class LeaderboardController : ControllerBase
                 if (resp.HasValue)
                 {
                     var entry = resp.Value;
-                    // Normalize class for comparison (trim whitespace)
-                    var entryClass = entry.Class?.Trim() ?? "";
+                    // Normalize class for comparison (trim whitespace) - use RaceClass as fallback
+                    var entryClass = (entry.Class ?? entry.RaceClass)?.Trim() ?? "";
                     var filterClass = classId?.Trim() ?? "";
                     if (string.IsNullOrEmpty(filterClass) || string.Equals(entryClass, filterClass, StringComparison.OrdinalIgnoreCase))
                         entries[eid] = entry;
@@ -532,17 +532,17 @@ public class LeaderboardController : ControllerBase
                 foreach (var sr in sorted)
                 {
                     var eid = sr.RowKey.Split('_')[0];
-                    if (!entries.TryGetValue(eid, out var entry) || string.IsNullOrEmpty(entry.Class))
+                    if (!entries.TryGetValue(eid, out var entry) || string.IsNullOrEmpty(entry.Class ?? entry.RaceClass))
                         continue;
 
-                    var classKey = $"{entry.Class}|{sr.RowKey}";
+                    var classKey = $"{(entry.Class ?? entry.RaceClass)}|{sr.RowKey}";
                     if (!classPositions.ContainsKey(classKey))
                     {
                         int classPos = 1;
                         foreach (var other in sorted)
                         {
                             var otherEid = other.RowKey.Split('_')[0];
-                            if (!entries.TryGetValue(otherEid, out var otherEntry) || otherEntry.Class != entry.Class)
+                            if (!entries.TryGetValue(otherEid, out var otherEntry) || (otherEntry.Class ?? otherEntry.RaceClass) != (entry.Class ?? entry.RaceClass))
                                 continue;
                             if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value < sr.TimeSeconds.Value)
                                 classPos++;
@@ -578,7 +578,7 @@ public class LeaderboardController : ControllerBase
                     }
                     previousTime = sr.TimeSeconds;
 
-                    var classKey = entry.Class != null ? $"{entry.Class}|{sr.RowKey}" : "";
+                    var classKey = (entry.Class ?? entry.RaceClass) != null ? $"{(entry.Class ?? entry.RaceClass)}|{sr.RowKey}" : "";
                     classPositions.TryGetValue(classKey, out var classPos);
 
                     items.Add(new
@@ -589,7 +589,7 @@ public class LeaderboardController : ControllerBase
                         driverName = entry.DriverName,
                         coDriverName = entry.CoDriverName,
                         raceNumber = entry.RaceNumber,
-                        raceClass = entry.Class,
+                        raceClass = entry.Class ?? entry.RaceClass,
                         timeSeconds = sr.TimeSeconds,
                         status = sr.Status
                     });

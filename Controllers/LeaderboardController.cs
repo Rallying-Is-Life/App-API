@@ -285,8 +285,8 @@ public class LeaderboardController : ControllerBase
 
         foreach (var stageSeq in entrantStageSeqs)
         {
-            // Get all stage results for this stage (SpecialStage)
-            var stageFilter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}' and StageType eq 'SpecialStage'";
+            // Get all stage results for this stage (competitive stages)
+            var stageFilter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}'";
             var allStageResults = new List<StageResultEntity>();
             await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: stageFilter, maxPerPage: 200))
             {
@@ -480,8 +480,8 @@ public class LeaderboardController : ControllerBase
             break;
         }
 
-        // Get stage results for SpecialStage type only
-        var filter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}' and StageType eq 'SpecialStage'";
+        // Get stage results for competitive stages (exclude RoadSection, Service, etc.)
+        var filter = $"PartitionKey eq '{id}' and StageSequence eq '{stageSeq:D3}'";
         var stageResults = new List<StageResultEntity>();
         await foreach (var entity in srClient.QueryAsync<StageResultEntity>(filter: filter, maxPerPage: 200))
         {

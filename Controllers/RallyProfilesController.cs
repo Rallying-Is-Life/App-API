@@ -322,6 +322,32 @@ public class RallyProfilesController : ControllerBase
             .OrderBy(s => s.TimeSeconds ?? int.MaxValue)
             .ToList();
 
+        // Compute class positions within each class (dense ranking)
+        var classPositions = new Dictionary<string, int>();
+        foreach (var sr in sorted)
+        {
+            var eid = sr.RowKey.Split('_')[0];
+            if (!entries.TryGetValue(eid, out var entry) || string.IsNullOrEmpty(entry.RaceClass))
+                continue;
+
+            var classKey = $"{entry.RaceClass}|{sr.RowKey}";
+            if (!classPositions.ContainsKey(classKey))
+            {
+                int classPos = 1;
+                foreach (var other in sorted)
+                {
+                    var otherEid = other.RowKey.Split('_')[0];
+                    if (!entries.TryGetValue(otherEid, out var otherEntry) || otherEntry.RaceClass != entry.RaceClass)
+                        continue;
+                    if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value < sr.TimeSeconds.Value)
+                        classPos++;
+                    else if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value == sr.TimeSeconds.Value && other.RowKey.CompareTo(sr.RowKey) < 0)
+                        classPos++;
+                }
+                classPositions[classKey] = classPos;
+            }
+        }
+
         // Compute overall positions (dense ranking)
         var items = new List<StageLeaderboardItem>();
         int position = 0;
@@ -352,34 +378,13 @@ public class RallyProfilesController : ControllerBase
             }
             previousTime = sr.TimeSeconds;
 
-            // Class position - compute within class
-            var classId = entry.RaceClass ?? "";
-            var classEntries = sorted.Where(s => entries.TryGetValue(s.RowKey.Split('_')[0], out var e) && e.RaceClass == classId).ToList();
-            var classPosition = 0;
-            double? classPrevTime = null;
-            foreach (var csr in classEntries)
-            {
-                if (csr.RowKey.Split('_')[0] == eid)
-                {
-                    classPosition = classEntries.IndexOf(csr) + 1;
-                    // Adjust for ties
-                    for (int i = 0; i < classEntries.IndexOf(csr); i++)
-                    {
-                        if (classEntries[i].TimeSeconds.HasValue && csr.TimeSeconds.HasValue &&
-                            classEntries[i].TimeSeconds.Value == csr.TimeSeconds.Value)
-                        {
-                            classPosition = i + 1;
-                            break;
-                        }
-                    }
-                    break;
-                }
-            }
+            var classKey = entry.RaceClass != null ? $"{entry.RaceClass}|{sr.RowKey}" : "";
+            classPositions.TryGetValue(classKey, out var classPosition);
 
             items.Add(new StageLeaderboardItem
             {
                 OverallPosition = position,
-                ClassPosition = classPosition,
+                ClassPosition = classPosition > 0 ? classPosition : 0,
                 EntrantId = eid,
                 DriverName = entry.DriverName,
                 CoDriverName = entry.CoDriverName,

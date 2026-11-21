@@ -274,9 +274,8 @@ public class LeaderboardController : ControllerBase
         var lbResp = await lbClient.GetEntityIfExistsAsync<RallyLeaderboardEntity>(id, entrantId);
         var leaderboard = lbResp.HasValue ? lbResp.Value : null;
 
-        // Pre-compute stage positions for all stages this entrant participated in (SpecialStage only)
+        // Pre-compute stage positions for all stages this entrant participated in
         var entrantStageSeqs = stageResults
-            .Where(s => string.Equals(s.StageType?.Trim(), "SpecialStage", StringComparison.OrdinalIgnoreCase))
             .Select(s => s.StageSequenceInt)
             .Distinct()
             .ToList();

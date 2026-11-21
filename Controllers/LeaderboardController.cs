@@ -370,7 +370,9 @@ public class LeaderboardController : ControllerBase
                     }
                     previousTime = sr.TimeSeconds;
 
-                    classPositions.TryGetValue(sr.RowKey, out var classPos);
+                    entries.TryGetValue(eid, out var entryObj);
+                    var classKey = (entryObj?.Class ?? entryObj?.RaceClass) != null ? $"{(entryObj.Class ?? entryObj.RaceClass)}|{sr.RowKey}" : "";
+                    classPositions.TryGetValue(classKey, out var classPos);
                     stagePositions[stageSeq] = (position, classPos);
                     break;
                 }

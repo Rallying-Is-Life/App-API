@@ -319,48 +319,33 @@ public class LeaderboardController : ControllerBase
             double? previousTime = null;
 
             // Pre-compute class position lookup
+                        // Compute class positions within each class (dense ranking)
             var classPositions = new Dictionary<string, int>();
-            var classGroups = sorted
-                .Where(s => entries.TryGetValue(s.RowKey.Split('_')[0], out var e) && !string.IsNullOrEmpty(e.Class))
-                .GroupBy(s => entries[s.RowKey.Split('_')[0]].Class)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            foreach (var classGroup in classGroups)
+            foreach (var sr in sorted)
             {
-                int classPos = 0;
-                double? classPrevTime = null;
-                foreach (var sr in classGroup.Value)
+                var eid = sr.RowKey.Split('_')[0];
+                if (!entries.TryGetValue(eid, out var entryObj) || string.IsNullOrEmpty(entryObj.Class ?? entryObj.RaceClass))
+                    continue;
+
+                var classKey = $"{(entryObj.Class ?? entryObj.RaceClass)}|{sr.RowKey}";
+                if (!classPositions.ContainsKey(classKey))
                 {
-                    var eid = sr.RowKey.Split('_')[0];
-                    if (sr.TimeSeconds.HasValue)
+                    int classPos = 1;
+                    foreach (var other in sorted)
                     {
-                        if (classPrevTime.HasValue && sr.TimeSeconds.Value == classPrevTime.Value)
-                        {
-                            // Tied - same position
-                        }
-                        else
-                        {
-                            classPos = classGroup.Value.IndexOf(sr) + 1;
-                            // Adjust for ties
-                            for (int i = 0; i < classGroup.Value.IndexOf(sr); i++)
-                            {
-                                if (classGroup.Value[i].TimeSeconds.HasValue && sr.TimeSeconds.HasValue &&
-                                    classGroup.Value[i].TimeSeconds.Value == sr.TimeSeconds.Value)
-                                {
-                                    classPos = i + 1;
-                                    break;
-                                }
-                            }
-                        }
+                        var otherEid = other.RowKey.Split('_')[0];
+                        if (!entries.TryGetValue(otherEid, out var otherEntry) || (otherEntry.Class ?? otherEntry.RaceClass) != (entryObj.Class ?? entryObj.RaceClass))
+                            continue;
+                        if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value < sr.TimeSeconds.Value)
+                            classPos++;
+                        else if (other.TimeSeconds.HasValue && sr.TimeSeconds.HasValue && other.TimeSeconds.Value == sr.TimeSeconds.Value && other.RowKey.CompareTo(sr.RowKey) < 0)
+                            classPos++;
                     }
-                    else
-                    {
-                        classPos = classGroup.Value.IndexOf(sr) + 1;
-                    }
-                    classPositions[sr.RowKey] = classPos;
-                    classPrevTime = sr.TimeSeconds;
+                    classPositions[classKey] = classPos;
                 }
             }
+
+
 
             foreach (var sr in sorted)
             {

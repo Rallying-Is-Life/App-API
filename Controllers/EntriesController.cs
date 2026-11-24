@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Azure.Data.Tables;
 using Azure.Identity;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace App_API.Controllers;
@@ -140,5 +141,65 @@ public class EntriesController : ControllerBase
             .ToList();
 
         return Ok(new { rallyRowKey = id, count = sorted.Count, items = sorted });
+    }
+
+    [HttpGet("/helpneeded/cars")]
+    public async Task<IActionResult> GetCanHelp()
+    {
+        var azureUri = Environment.GetEnvironmentVariable("azureStorageUri") ?? "";
+        var credential = new DefaultAzureCredential();
+        var client = new TableClient(new Uri(azureUri), TableNames.tblEventEntries, credential);
+
+        var rallyClient = new TableClient(new Uri(azureUri), TableNames.tblRallyDetails, credential);
+
+        var rallies = new Dictionary<string, RallyTableEntity>();
+        await foreach (var r in rallyClient.QueryAsync<RallyTableEntity>(maxPerPage: 200))
+        {
+            if (string.IsNullOrEmpty(r.RowKey))
+                continue;
+            rallies[r.RowKey] = r;
+        }
+
+        var items = new List<object>();
+        await foreach (var e in client.QueryAsync<TableEntity>(maxPerPage: 200))
+        {
+            var carRowKey = e.GetString("CarRowKey") ?? "";
+            if (!string.IsNullOrEmpty(carRowKey))
+                continue;
+
+            var rallyId = e.PartitionKey ?? "";
+            if (!string.IsNullOrEmpty(rallyId) && rallies.TryGetValue(rallyId, out var rally))
+            {
+                var year = rally.Year;
+                var eventName = rally.EventName ?? "";
+                var raceNumber = e.GetString("RaceNumber") ?? "";
+                var carMake = e.GetString("CarMake") ?? "";
+                var carModel = e.GetString("CarModel") ?? "";
+                var driver = e.GetString("DriverName") ?? "";
+                var coDriver = e.GetString("CoDriverName") ?? "";
+
+                items.Add(new
+                {
+                    rallyRowKey = rallyId,
+                    year = year,
+                    eventName = eventName,
+                    carNumber = raceNumber,
+                    carMake = carMake,
+                    carModel = carModel,
+                    driver = driver,
+                    coDriver = coDriver
+                });
+            }
+        }
+
+        var sorted = items.OrderByDescending(x =>
+        {
+            int y = (int?)x.GetType().GetProperty("year")?.GetValue(x) ?? 0;
+            string ev = (string)x.GetType().GetProperty("eventName")?.GetValue(x) ?? "";
+            string cn = (string)x.GetType().GetProperty("carNumber")?.GetValue(x) ?? "";
+            return (y, ev, cn);
+        }).ToList();
+
+        return Ok(new { count = sorted.Count, items = sorted });
     }
 }

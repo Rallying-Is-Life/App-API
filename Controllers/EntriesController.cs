@@ -143,7 +143,7 @@ public class EntriesController : ControllerBase
         return Ok(new { rallyRowKey = id, count = sorted.Count, items = sorted });
     }
 
-    [HttpGet("can-help")]
+    [HttpGet("/helpneeded/cars")]
     public async Task<IActionResult> GetCanHelp()
     {
         var azureUri = Environment.GetEnvironmentVariable("azureStorageUri") ?? "";

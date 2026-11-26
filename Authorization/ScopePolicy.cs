@@ -10,8 +10,9 @@ public class ScopeHandler : AuthorizationHandler<ScopePolicy>
     protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, ScopePolicy requirement)
     {
         var scopeClaim = context.User.FindFirst("scp")?.Value ?? "";
-        // scope claim is space-delimited, e.g. "Api.Write Api.Read"
-        if (scopeClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(requirement.Scope))
+        var scopes = scopeClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        // Match bare scope (Api.Read) or prefixed scope (api://rallyingislife-api/Api.Read)
+        if (scopes.Any(s => s == requirement.Scope || s.EndsWith("/" + requirement.Scope, StringComparison.OrdinalIgnoreCase)))
             context.Succeed(requirement);
         return Task.CompletedTask;
     }

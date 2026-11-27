@@ -16,7 +16,16 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 // If CiamTenantName is set, use the CIAM authority and issuer; else use regular Entra ID
 var tenantId = Environment.GetEnvironmentVariable("TenantID") ?? Environment.GetEnvironmentVariable("Auth__TenantId") ?? Environment.GetEnvironmentVariable("AzureAd__TenantId") ?? "";
 var ciamTenantName = Environment.GetEnvironmentVariable("CiamTenantName") ?? "";
-var apiAudience = Environment.GetEnvironmentVariable("Auth__Audience") ?? Environment.GetEnvironmentVariable("Auth__ClientId") ?? "";
+var apiAudiences = new[]
+{
+    Environment.GetEnvironmentVariable("Auth__Audience"),
+    Environment.GetEnvironmentVariable("Auth__ClientId"),
+    Environment.GetEnvironmentVariable("ClientID")
+}
+.Where(audience => !string.IsNullOrWhiteSpace(audience))
+.Cast<string>()
+.Distinct(StringComparer.OrdinalIgnoreCase)
+.ToArray();
 
 // Build the metadata authority and token issuer for CIAM vs regular Entra ID.
 // CIAM discovery uses the tenant-name host; CIAM access tokens use the tenant-ID host as issuer.
@@ -34,11 +43,10 @@ builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", o =>
     {
         o.Authority = authority;
-        o.Audience = apiAudience;
         o.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
             ValidateAudience = true,
-            ValidAudience = apiAudience,
+            ValidAudiences = apiAudiences,
             ValidateIssuer = true,
             ValidIssuer = validIssuer,
             NameClaimType = "name",

@@ -13,19 +13,20 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 });
 
 // CIAM (Entra External ID) support
-// If CiamTenantName is set, use CIAM authority/issuer; else use regular Entra ID
-var tenantId = Environment.GetEnvironmentVariable("Auth__TenantId") ?? Environment.GetEnvironmentVariable("TenantID") ?? "";
+// If CiamTenantName is set, use the CIAM authority and issuer; else use regular Entra ID
+var tenantId = Environment.GetEnvironmentVariable("TenantID") ?? Environment.GetEnvironmentVariable("Auth__TenantId") ?? Environment.GetEnvironmentVariable("AzureAd__TenantId") ?? "";
 var ciamTenantName = Environment.GetEnvironmentVariable("CiamTenantName") ?? "";
 var apiAudience = Environment.GetEnvironmentVariable("Auth__Audience") ?? Environment.GetEnvironmentVariable("Auth__ClientId") ?? "";
 
-// Build authority and issuer for CIAM vs regular Entra ID
-// For CIAM: Authority = Issuer = https://{tenant-name}.ciamlogin.com/{tenant-id}/v2.0
-// For regular Entra ID: Authority = Issuer = https://login.microsoftonline.com/{tenant-id}/v2.0
+// Build the metadata authority and token issuer for CIAM vs regular Entra ID.
+// CIAM discovery uses the tenant-name host; CIAM access tokens use the tenant-ID host as issuer.
 var authority = string.IsNullOrEmpty(ciamTenantName)
     ? $"https://login.microsoftonline.com/{tenantId}/v2.0"
     : $"https://{ciamTenantName}.ciamlogin.com/{tenantId}/v2.0";
 
-var validIssuer = authority;
+var validIssuer = string.IsNullOrEmpty(ciamTenantName)
+    ? authority
+    : $"https://{tenantId}.ciamlogin.com/{tenantId}/v2.0";
 
 builder.Services.AddControllers();
 // Auth middleware (selective — controllers use [Authorize] / [AllowAnonymous])
